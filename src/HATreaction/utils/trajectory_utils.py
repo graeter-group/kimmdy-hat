@@ -14,7 +14,7 @@ from barrierdata.utils.lmbtr_utils import compress_lmbtr
 from barrierdata.utils.structure_creation_utils import mda_to_ase, check_cylinderclash
 import logging
 
-version = 0.1
+version = 0.2
 
 
 def find_radical_pos(
@@ -615,6 +615,7 @@ def cap_single_rad(u, ts, rad, bonded_rad, h_cutoff=3, env_cutoff=7):
     env = u.atoms.select_atoms(
         f"point { str(rad.positions).strip('[ ]') } {env_cutoff}"
     )
+    ts2 = MDA.transformations.unwrap(env)(ts)
 
     end_poss = find_radical_pos(rad[0], bonded_rad)
 
