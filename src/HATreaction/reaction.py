@@ -70,9 +70,6 @@ class HAT_reaction(Reaction):
             )
         )
 
-        list(u_sub.select_atoms(f"index {' '.join(('356', '513'))}").ids)
-        u_sub.atoms.ids
-
         # check manually w/ ngl:
         if 0:
             import nglview as ngl
