@@ -626,7 +626,7 @@ def cap_single_rad(u, ts, rad, bonded_rad, h_cutoff=3, env_cutoff=7):
                 f"point { str(end_pos).strip('[ ]') } {h_cutoff} and element H"
             )
         )
-    hs = sum(hs)
+    hs = sum(hs) - bonded_rad # reacting H be at radical already
 
     # hs = (
     #     env.select_atoms(
