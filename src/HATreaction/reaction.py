@@ -63,7 +63,7 @@ class HAT_reaction(Reaction):
         u_sub = MDA.Merge(sub_atms)
         u_sub.load_new(trr, sub=sub_atms.indices)
 
-        # subuni has different indices, translate:
+        # subuni has different indices, translate: WARNING: id 1-based!!!
         rad_idxs_sub = list(
             map(
                 str, u_sub.select_atoms(f"id {' '.join([i for i in rad_idxs])}").indices
