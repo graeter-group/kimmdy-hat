@@ -402,12 +402,8 @@ def cap_aa(atms):
                         linker = True
 
                 N_alphas = env.select_atoms(
-                    f"(bonded index {cap_d['N'][0].ix}) and (resid {cap_d['N'][0].resid})",f"(bonded index {cap_d['N'][0].ix}) and name H"
+                    f"(bonded index {cap_d['N'][0].ix}) and (resid {cap_d['N'][0].resid})"
                 )
-                logging.info("Checking NH cap problem:")
-                logging.info(N_alphas)
-                ref = env.select_atoms(f"(bonded index {cap_d['N'][0].ix})")
-                logging.info(ref)
 
                 # C_a --> CH3,
                 # everything w/ more or less than 1 H attached --> H
@@ -457,7 +453,7 @@ def cap_aa(atms):
             # build cap from atoms of next AA
             cap_d = {
                 "C": env.select_atoms(
-                    f"(bonded index {pe.ix}) and not resid {pe.resid} and not name H"
+                    f"(bonded index {pe.ix}) and not resid {pe.resid}"
                 )
             }
 
