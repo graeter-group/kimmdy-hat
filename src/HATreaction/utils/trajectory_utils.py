@@ -155,7 +155,6 @@ def calc_lmbtr(
     env_cutoff=7,
     h_cutoff=4,
 ):
-
     if isinstance(rad_idxs, int):
         rad_idxs = [rad_idxs]
     rads = []
@@ -402,8 +401,13 @@ def cap_aa(atms):
                         linker = True
 
                 N_alphas = env.select_atoms(
-                    f"(bonded index {cap_d['N'][0].ix}) and (resid {cap_d['N'][0].resid})"
+                    f"((bonded index {cap_d['N'][0].ix}) and (resid {cap_d['N'][0].resid})) or ((bonded index {cap_d['N'][0].ix}) and name H)"
                 )
+                # TODO Remove logging
+                logging.info("Checking NH cap problem:")
+                logging.info(N_alphas)
+                ref = env.select_atoms(f"(bonded index {cap_d['N'][0].ix})")
+                logging.info(ref)
 
                 # C_a --> CH3,
                 # everything w/ more or less than 1 H attached --> H
@@ -453,7 +457,7 @@ def cap_aa(atms):
             # build cap from atoms of next AA
             cap_d = {
                 "C": env.select_atoms(
-                    f"(bonded index {pe.ix}) and not resid {pe.resid}"
+                    f"((bonded index {pe.ix}) and not resid {pe.resid}) and not name H"
                 )
             }
 
@@ -626,7 +630,7 @@ def cap_single_rad(u, ts, rad, bonded_rad, h_cutoff=3, env_cutoff=7):
                 f"point { str(end_pos).strip('[ ]') } {h_cutoff} and element H"
             )
         )
-    hs = sum(hs) - bonded_rad # reacting H be at radical already
+    hs = sum(hs) - bonded_rad  # reacting H be at radical already
 
     # hs = (
     #     env.select_atoms(
