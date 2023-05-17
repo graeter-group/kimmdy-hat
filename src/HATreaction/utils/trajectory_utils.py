@@ -14,11 +14,12 @@ from barrierdata.utils.lmbtr_utils import compress_lmbtr
 from barrierdata.utils.structure_creation_utils import mda_to_ase, check_cylinderclash
 import logging
 
-version = 0.2
+version = 0.3
 
 
 def find_radical_pos(
-    center: MDA.core.groups.Atom, bonded: MDA.core.groups.AtomGroup, tetrahedral=False
+    center: MDA.core.groups.Atom,
+    bonded: MDA.core.groups.AtomGroup,
 ):
     """Calculates possible radical positions of a given radical atom
 
@@ -41,47 +42,12 @@ def find_radical_pos(
     scale_O = 0.97
     scale_S = 1.41
 
-    if center.element == "C" and len(bonded) == 2:
-        c_alphas = center.bonded_atoms
-        c_o = c_alphas[np.nonzero(c_alphas.elements == "O")]
-        assert len(c_o) in [0, 1], "Carboxyl radical?"
-        if len(c_o) > 0 and len(c_o[0].bonded_atoms) > 1:
-            tetrahedral = True
-
-    if tetrahedral:
-        # MAKE SP3 from C with 2 bonds
-        # invert bonded positions
-        inv_1 = (center.position - bonded[0].position) + center.position
-        inv_2 = (center.position - bonded[1].position) + center.position
-        # construct rotation axis
-        midpoint = (inv_2 - inv_1) * 0.5 + inv_1
-        rot_ax = midpoint - center.position
-        # 90 degree rotation
-        r = Rotation.from_rotvec((np.pi / 2) * (rot_ax / np.linalg.norm(rot_ax)))
-        # rotated bonds relative to center
-        rad_1 = r.apply(inv_1 - center.position)
-        rad_2 = r.apply(inv_2 - center.position)
-
-        # scale to correct bond length, make absolute
-        if center.element == "N":
-            scale = scale_N
-        elif center.element == "C":
-            scale = scale_C
-        else:
-            raise NotImplementedError("H Bondlength to central atom missing")
-
-        rad_1 = (rad_1 / np.linalg.norm(rad_1)) * scale + center.position
-        rad_2 = (rad_2 / np.linalg.norm(rad_2)) * scale + center.position
-        return [rad_1, rad_2]
-
     if len(bonded) in [2, 3]:
         assert center.element in [
             "C",
             "N",
         ], f"Element {center.element} does not match bond number"
 
-        # prediction: inverse midpoint between bonded
-        # scale to correct bond length, make absolute
         if center.element == "N":
             scale = scale_N
         elif center.element == "C":
@@ -95,12 +61,29 @@ def find_radical_pos(
 
         midpoint = sum(b_normed)
 
-        v = midpoint / np.linalg.norm(midpoint)
-        rad = center.position + (-1 * v * scale)
-        return [rad]
+        if len(bonded) == 3 and np.linalg.norm(midpoint) < 0.6:
+            # flat structure -> two end positions:
+            # midpoint: 109.5 -> ~1, 120 -> 0
+            ab = bonded[1].position - bonded[0].position
+            ac = bonded[2].position - bonded[0].position
+            normal = np.cross(ab, ac)
+            normal = normal / np.linalg.norm(normal)
+
+            rad1 = center.position + (normal * scale)
+            rad2 = center.position + (normal * (-1) * scale)
+            rads = [rad1, rad2]
+
+        else:
+            # two bonds, or three in tetraeder:
+            # -> mirror mean bond
+            v = midpoint / np.linalg.norm(midpoint)
+            rads = [center.position + (-1 * v * scale)]
+
+        return rads
 
     # Radicals w/ only one bond:
     elif len(bonded) == 1:
+        # suggest positions in a 109.5 degree cone
         assert center.element in ["O", "S"], "Element type does not match bond number"
         if center.element == "O":
             scale = scale_O
@@ -115,7 +98,7 @@ def find_radical_pos(
         rnd_rot_ax = np.cross(b_vec, rnd_vec)
         rnd_rot_ax = rnd_rot_ax / np.linalg.norm(rnd_rot_ax)
 
-        r1 = Rotation.from_rotvec(1.911 * rnd_rot_ax)  # 109.5 degree
+        r1 = Rotation.from_rotvec(1.911 * rnd_rot_ax)  # 109.5 degree (as in EtOH)
         r2 = Rotation.from_rotvec(0.785 * b_vec)  # 45 degree
 
         ends = [r1.apply(b_vec)]  # up to 109.5
@@ -818,11 +801,15 @@ def extract_subsystems(
                 if unique:
                     new_i_hash = hash(capped["meta"]["indices"])
                 else:
-                    new_i_hash = i
+                    new_i_hash = str(i) + str(rad.indices) + str(ts.frame)
 
                 # skip existing systems w/ bigger translation
                 if new_i_hash in capped_systems.keys():
                     if capped["meta"]["translation"] > capped_systems[new_i_hash][0]:
+                        print("Skipping due to translation")
+                        print(
+                            capped["meta"]["translation"], capped_systems[new_i_hash][0]
+                        )
                         continue
 
                 capped_systems[new_i_hash] = (
