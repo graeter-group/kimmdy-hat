@@ -4,13 +4,36 @@ from HATreaction.utils import trajectory_utils
 import pickle
 import json
 import pytest
+import MDAnalysis as MDA
+
+def pickle_universe():
+    u = MDA.Universe(
+        str(Path(__file__).parent / "test_capping_io" / "tri_helix.gro"),
+        guess_bonds=True,
+        vdwradii={"DUMMY": 0.0},
+        in_memory=True,
+    )
+    u.add_TopologyAttr("elements", u.atoms.types)
+    with open(Path(__file__).parent / "test_capping_io" / "universe.pckl", 'wb') as f:
+        pickle.dump(u, f)
+
 
 # create random manual verified testests
 @pytest.fixture(scope="module")
 def universe():
-    u_p = Path(__file__).parent / "test_capping_io" / "universe.pckl"
+    try:
+        u_p = Path(__file__).parent / "test_capping_io" / "universe.pckl"
+        with open(u_p, 'rb') as f:
+            u = pickle.load(f)
+        return u
+    
+    except Exception:
+        print("Could not load pickled universe, recreating..", end="")
+        pickle_universe()
+
+    print("Done\nLoading new pickle")
     with open(u_p, 'rb') as f:
-        u = pickle.load(f, )
+        u = pickle.load(f)
     return u
 
 test_files = list((Path(__file__).parent / "test_capping_io").glob("*.json"))
