@@ -1,4 +1,5 @@
 import MDAnalysis as MDA
+import numpy as np
 
 def find_radicals(u):
     """
@@ -23,3 +24,64 @@ def find_radicals(u):
     if len(atoms) == 0:
         return [MDA.Universe.empty(0).atoms]
     return atoms 
+
+
+def check_cylinderclash(a, b, t, r_min=0.8, d_min=None, verbose=False):
+    """Checks for atoms in a cylinder around a possible HAT reaction path.
+    Cylinder begins/ends 10% after/before the end points.
+    Ref.: https://geomalgorithms.com/a02-_lines.html
+
+    Parameters
+    ----------
+    a : Union[np.ndarray, list]
+        Center of cylinder base
+    b : Union[np.ndarray, list]
+        Center of cylinder top
+    t : Union[np.ndarray, list]
+        Testpoint, or list of testpoints
+    d_min
+    r_min : int, optional
+        Radius of cylinder, by default 0.8
+
+    Returns
+    -------
+    bool
+        True if no points are inside the cylinder, False otherwise.
+    """
+
+    def _check_point(a, b, t, r_min, verbose):
+        v = b - a  # apex to base
+        w = t - a  # apex to testpoint
+        c1 = np.dot(v, w)
+        c2 = np.dot(v, v)
+        x = c1 / c2  # percentage along axis
+
+        tx = a + (x * v)  # projection of t on x
+        r = np.linalg.norm(t - tx)
+
+        if x < 0.1 or x > 0.9 or r > r_min:
+            # point is outside cylinder
+            return True
+        if verbose:
+            print(f"a = {a}, b = {b}, t = {t}")
+            print(f"x = {x}, r = {r}")
+        return False
+
+    if isinstance(t, np.ndarray) and t.shape == (3,):
+        return _check_point(a, b, t, r_min, verbose)
+
+    elif (
+        (isinstance(t, np.ndarray) and t.shape[1] == 3)
+        or isinstance(t, list)
+        and len(t[0]) == 3
+    ):
+        return all(
+            [
+                _check_point(np.array(a), np.array(b), np.array(p), r_min, verbose)
+                for p in t
+            ]
+        )
+
+    else:
+        raise ValueError(f"Type/Shape of t wrong: {t}")
+    

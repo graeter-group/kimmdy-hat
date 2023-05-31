@@ -1,6 +1,5 @@
 import json
 from importlib.resources import files as res_files
-from pathlib import Path
 import logging
 
 import MDAnalysis as MDA
@@ -10,20 +9,16 @@ from HATreaction.utils.trajectory_utils import extract_subsystems, save_capped_s
 from HATreaction.utils.input_generation import create_meta_dataset_predictions
 from HATreaction.utils.utils import find_radicals
 from kimmdy.reaction import (
-    ConversionRecipe,
-    ConversionType,
-    Reaction,
-    ReactionResult,
-    ReactionOutcome,
-    Conversion,
+    Move,
+    Recipe,
+    RecipeCollection,
+    ReactionPlugin,
 )
-from kimmdy.runmanager import RunManager
-from MDAnalysis.topology.guessers import guess_bonds
-from MDAnalysis.topology.tables import vdwradii
+
 from tensorflow.keras.models import Model, load_model
 
 
-class HAT_reaction(Reaction):
+class HAT_reaction(ReactionPlugin):
     type_scheme = {
         "hat_reaction": {
             "h_cutoff": float,
@@ -56,7 +51,7 @@ class HAT_reaction(Reaction):
         self.polling_rate = self.config.polling_rate
 
     # def get_reaction_result(self, task_files, latest_files, config, radicals) -> ReactionResult:
-    def get_reaction_result(self, files) -> ReactionResult:
+    def get_recipe_collection(self, files) -> RecipeCollection:
         tpr = str(files.input["tpr"])
         trr = str(files.input["trr"])
         u = MDA.Universe(str(tpr), str(trr))
@@ -80,7 +75,7 @@ class HAT_reaction(Reaction):
         # every 10 rate queries, update environment selection around radical
         for ts in u.trajectory[:: self.polling_rate * 10]:
             u_sub = MDA.Merge(sub_atms)
-            u_sub.load_new(trr, sub=sub_atms.indices)
+            u_sub.load_new(str(trr), sub=sub_atms.indices)
             sub_start_t = ts.frame
             sub_end_t = ts.frame + self.polling_rate * 10
 
@@ -133,19 +128,31 @@ class HAT_reaction(Reaction):
         # Rate
         rates = list(np.multiply(self.freqfac, np.power(np.e, (-ys / 0.593))))
         recipes = []
-        frames = []
 
-        for meta_d in meta_ds:
+        for meta_d, rate in zip(meta_ds, rates):
             sub_idxs = meta_d["indices"][0:2]
             idxs = [u_sub.select_atoms(f"index {sub_idx}").ids for sub_idx in sub_idxs]
             assert all(
                 [len(i) == 1 for i in idxs]
             ), f"HAT atom index translation error! \n{meta_d}"
-            idxs = [str(idx[0] + 1) for idx in idxs]
+            idxs = [idx[0] + 1 for idx in idxs]
+            
+            f1 = meta_d["frame"] - self.polling_rate
+            if f1 < 0:
+                f1 = 0
+            f2 = meta_d["frame"]
+            t1 = u.trajectory[f1].time
+            t2 = u.trajectory[f2].time
 
-            recipes.append(Conversion(type=[ConversionType.MOVE], atom_idx=[idxs]))
-            frames.append(meta_d["frame"])
+            recipes.append(
+                Recipe(
+                    recipe_steps=[Move(idx_to_move=idxs[0], idx_to_bind=idxs[1])],
+                    rates=[rate],
+                    timespans=[[t1, t2]],
+                )
+            )
 
-        assert len(rates) == len(recipes)
+        recipe_collection = RecipeCollection(recipes)
+        recipe_collection.aggregate_reactions()
 
-        return ReactionOutcome(recipe=recipes, r_ts=rates, ts=frames)
+        return recipe_collection

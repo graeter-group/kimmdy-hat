@@ -1,6 +1,6 @@
 from itertools import combinations
 import logging
-from typing import Union
+from pathlib import Path
 from MDAnalysis.coordinates.XTC import XTCReader
 from MDAnalysis.analysis.distances import self_distance_array
 
@@ -10,11 +10,10 @@ import random
 from scipy.spatial.transform import Rotation
 from tqdm.autonotebook import tqdm
 
-from barrierdata.utils.lmbtr_utils import compress_lmbtr
-from barrierdata.utils.structure_creation_utils import mda_to_ase, check_cylinderclash
+from HATreaction.utils.utils import check_cylinderclash
 import logging
 
-version = 0.3
+version = 0.4
 
 
 def find_radical_pos(
@@ -113,85 +112,6 @@ def find_radical_pos(
 
     else:
         raise ValueError(f"Weired count of bonds: {list(bonded)}\nCorrect radicals?")
-
-
-def idx_to_radicals(u, idx_1, idx_2):
-    rad_1 = u.select_atoms(f"index {idx_1}")[0]
-    rad_2 = u.select_atoms(f"index {idx_2}")[0]
-
-    bonded_1 = u.select_atoms(f"bonded index {idx_1}")
-    bonded_2 = u.select_atoms(f"bonded index {idx_2}")
-
-    rad_positions = []
-    rad_positions.extend(find_radical_pos(rad_1, bonded_1 - rad_2))
-    rad_positions.extend(find_radical_pos(rad_2, bonded_2 - rad_1))
-
-    return rad_positions
-
-
-def calc_lmbtr(
-    u: MDA.Universe,
-    rad_idxs: Union[int, list],
-    lmbtr,
-    step=1,
-    flash=500,
-    env_cutoff=7,
-    h_cutoff=4,
-):
-    if isinstance(rad_idxs, int):
-        rad_idxs = [rad_idxs]
-    rads = []
-    for rad_idx in rad_idxs:
-        rads.append(u.select_atoms(f"index {rad_idx}")[0])
-    bonded = []
-    for i, rad_idx in enumerate(rad_idxs):
-        bonded.append(u.select_atoms(f"bonded index {rad_idx}"))
-        # removes bonds between radicals
-        for rad in rads[:i] + rads[i + 1 :]:
-            bonded[-1] -= rad
-
-    ase_envs = []
-    ase_envs_all = []
-    lmbtr_positions = []
-    lmbtr_positions_all = []
-    lmbtr_results = []
-    for _ in tqdm(u.trajectory[::step]):
-        for rad, bonded_atoms in zip(rads, bonded):
-            rad_pos_list = find_radical_pos(rad, bonded_atoms)
-
-            for rad_pos in rad_pos_list:
-                env = u.select_atoms(
-                    f"point { str(rad_pos).strip('[ ]') } {env_cutoff}"
-                )
-
-                hs = env.select_atoms(
-                    f"point { str(rad_pos).strip('[]') } {h_cutoff} and element H"
-                )
-
-                for h in hs:
-                    lmbtr_positions.append(np.expand_dims(rad_pos, 0))
-                    ase_envs.append(mda_to_ase(env - h))
-                    ase_h = mda_to_ase(h)
-                    ase_h.symbols = "Y"
-                    ase_envs[-1] += ase_h
-
-                if len(ase_envs) >= flash:
-                    lmbtr_results.extend(
-                        lmbtr.create(ase_envs, lmbtr_positions, n_jobs=8)
-                    )
-                    ase_envs_all.extend(ase_envs)
-                    ase_envs = []
-                    lmbtr_positions_all.extend(lmbtr_positions)
-                    lmbtr_positions = []
-
-    if len(ase_envs) > 0:
-        lmbtr_results.extend(lmbtr.create(ase_envs, lmbtr_positions, n_jobs=1))
-        ase_envs_all.extend(ase_envs)
-        lmbtr_positions_all.extend(lmbtr_positions)
-
-    lmbtr_results = compress_lmbtr(lmbtr, lmbtr_results, flatten=True, k3_center="Y")
-    print(f"lmbtr calculated on {len(lmbtr_results)} positions")
-    return lmbtr_results, ase_envs_all, lmbtr_positions_all
 
 
 def get_residue(atm):
@@ -386,11 +306,7 @@ def cap_aa(atms):
                 N_alphas = env.select_atoms(
                     f"((bonded index {cap_d['N'][0].ix}) and (resid {cap_d['N'][0].resid})) or ((bonded index {cap_d['N'][0].ix}) and name H)"
                 )
-                # TODO Remove logging
-                logging.info("Checking NH cap problem:")
-                logging.info(N_alphas)
                 ref = env.select_atoms(f"(bonded index {cap_d['N'][0].ix})")
-                logging.info(ref)
 
                 # C_a --> CH3,
                 # everything w/ more or less than 1 H attached --> H
@@ -602,7 +518,8 @@ def cap_single_rad(u, ts, rad, bonded_rad, h_cutoff=3, env_cutoff=7):
     env = u.atoms.select_atoms(
         f"point { str(rad.positions).strip('[ ]') } {env_cutoff}"
     )
-    ts2 = MDA.transformations.unwrap(env)(ts)
+    # ts2 = MDA.transformations.unwrap(env)(ts)
+    env.unwrap()
 
     end_poss = find_radical_pos(rad[0], bonded_rad)
 
