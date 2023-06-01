@@ -135,7 +135,8 @@ class HAT_reaction(ReactionPlugin):
             assert all(
                 [len(i) == 1 for i in idxs]
             ), f"HAT atom index translation error! \n{meta_d}"
-            idxs = [idx[0] + 1 for idx in idxs]
+            # idxs = [idx[0] + 1 for idx in idxs] # one-based
+            idxs = [idx[0] for idx in idxs] # zero-based
             
             f1 = meta_d["frame"] - self.polling_rate
             if f1 < 0:
