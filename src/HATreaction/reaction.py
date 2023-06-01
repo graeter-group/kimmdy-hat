@@ -59,7 +59,7 @@ class HAT_reaction(ReactionPlugin):
         se_dir = files.outputdir / "se"
         # interp_dir = files.outputdir / "interp"
 
-        rad_idxs = self.runmng.radical_idxs
+        rad_idxs = getattr(self.runmng, "radical_idxs", [])
         if len(rad_idxs) < 1:
             logging.info("No radicals known, searching in structure..")
             rad_idxs = [str(a[0].index) for a in find_radicals(u)]
