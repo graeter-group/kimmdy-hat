@@ -7,6 +7,9 @@ import pytest
 import MDAnalysis as MDA
 
 def pickle_universe():
+    """Creates pickled MDAnalysis Universe for rapid loading. 
+    Pickles break between MDA version changes.
+    """    
     u = MDA.Universe(
         str(Path(__file__).parent / "test_capping_io" / "tri_helix.gro"),
         guess_bonds=True,

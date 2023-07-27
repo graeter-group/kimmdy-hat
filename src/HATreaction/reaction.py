@@ -19,6 +19,7 @@ from tensorflow.keras.models import Model, load_model
 
 
 class HAT_reaction(ReactionPlugin):
+
     type_scheme = {
         "hat_reaction": {
             "h_cutoff": float,
@@ -147,7 +148,7 @@ class HAT_reaction(ReactionPlugin):
 
             recipes.append(
                 Recipe(
-                    recipe_steps=[Move(idx_to_move=idxs[0], idx_to_bind=idxs[1])],
+                    recipe_steps=[Move(ix_to_move=idxs[0], ix_to_bind=idxs[1])],
                     rates=[rate],
                     timespans=[[t1, t2]],
                 )
