@@ -1,1 +1,2 @@
-include src/HATmodels
+graft src
+graft tests

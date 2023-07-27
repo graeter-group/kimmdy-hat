@@ -1,17 +1,18 @@
 import tensorflow as tf
 from tensorflow.python.data.ops.dataset_ops import Dataset
 import numpy as np
-from kgcnn.utils.adj import (
+from kgcnn.graph.adj import (
     coordinates_to_distancematrix,
     define_adjacency_from_distance,
 )
-from kgcnn.utils.adj import sort_edge_indices
+from kgcnn.graph.adj import sort_edge_indices
 from ase.io import read
 from pathlib import Path
 from tqdm import tqdm
 import pandas as pd
 
-version = 0.2
+# KGCNN==2.1.0, tensorflow==2.10.0
+version = 0.3  # Also used in HATreaction pluginversion
 
 
 def _preproc_pdb(pdbs):
@@ -25,6 +26,8 @@ def _preproc_pdb(pdbs):
     pos1 = mol1.positions
     pos2 = mol2.positions
 
+    # mark moving H
+    atm1[0] = 2
     # add ghost atom at H target pos
     atms = np.concatenate((np.array([0]), atm1), axis=0)
     pos = np.concatenate((np.array([pos2[0]]), pos1), axis=0)
@@ -48,6 +51,15 @@ def _preproc_pdb(pdbs):
     radical_node_index = tf.convert_to_tensor(((0, 1),), tf.int64)  # shape=(1,2)
     radical_edge_index = tf.convert_to_tensor(((0,),), tf.int64)  # shape=(1,1)
     edge_dist = tf.convert_to_tensor(((dist[0, 1],),), tf.float32)  # shape=(1,1)
+
+    # atms = np.array([0, 1, 8, 8, 7, 6, 6, 6, 6, 6, 1, 1, 1, 1, 1, 1, 1, 1, 8, 8, 8, 7,
+    #    6, 6, 6, 6, 6, 1, 1, 1, 1, 1, 1, 1, 1])
+
+    # # np.save("/hits/fast/mbm/riedmiki/nn/barrier_gnn_out/cache2/tmp1", pos)
+    # # np.save("/hits/fast/mbm/riedmiki/nn/barrier_gnn_out/cache2/tmp2", edge_indices)
+
+    # pos = np.load("/hits/fast/mbm/riedmiki/nn/barrier_gnn_out/cache2/tmp1.npy")
+    # edge_indices= np.load("/hits/fast/mbm/riedmiki/nn/barrier_gnn_out/cache2/tmp2.npy")
 
     return (
         atms,
@@ -81,13 +93,17 @@ def _tf_preproc_pdb(pdbs):
         ),
     )
     atms.set_shape((None,))
+    # equivariant.set_shape((None, 128, 3))
     pos.set_shape((None, 3))
+    # edge_indices.set_shape((None, 2))
     edge_indices.set_shape((None, 2))
     radical_node_index.set_shape((None, 2))
     radical_edge_index.set_shape((None, 1))
     edge_dist.set_shape((None, 1))
 
+    # return atms, pos, edge_indices, radical_node_index
     return atms, pos, edge_indices, radical_node_index, radical_edge_index, edge_dist
+    # return atms, pos, edge_indices, radical_edge_index
 
 
 def mk_mols_ds(pdb_pairs):
@@ -101,14 +117,7 @@ def mk_mols_ds(pdb_pairs):
 
 
 def metas_to_ds(
-    meta_files,
-    max_dist,
-    min_dist,
-    opt,
-    scale=False,
-    old_scale=None,
-    mask_energy=True,
-    oneway=False,
+    meta_files, max_dist, min_dist, opt, scale=False, old_scale=None, mask_energy=True
 ):
     # Load energies
     meta_dicts1 = []
@@ -168,18 +177,12 @@ def metas_to_ds(
         energies1.append(np.NaN)
         energies2.append(np.NaN)
 
-    if oneway:
-        pdbs = np.array(pdbs1, dtype=str)
-        energies = np.array(energies1, dtype=float)
-        meta_dicts = np.array(meta_dicts1)
-        metas_masked = np.array(meta_files)
-    else:
-        pdbs2 = [(j, i) for i, j in pdbs1]
-        pdbs = np.array(pdbs1 + pdbs2, dtype=str)
-        energies = np.array(energies1 + energies2, dtype=float)
-        meta_dicts = np.array(meta_dicts1 + meta_dicts2)
-        metas_masked = np.array(meta_files + meta_files)
+    pdbs2 = [(j, i) for i, j in pdbs1]
 
+    energies = np.array(energies1 + energies2, dtype=np.float64)
+    pdbs = np.array(pdbs1 + pdbs2, dtype=str)
+    meta_dicts = np.array(meta_dicts1 + meta_dicts2)
+    metas_masked = np.array(meta_files + meta_files)
     mask = np.logical_not(np.isnan(energies))
 
     if mask_energy:
@@ -377,7 +380,6 @@ def create_meta_dataset_predictions(
     opt=False,
     descriptors=None,
     mask_energy=True,
-    oneway=False,
 ):
     """Analogue to create_meta_dataset, but returns inputs and energies separate
 
@@ -418,13 +420,7 @@ def create_meta_dataset_predictions(
     """
 
     energies, pdbs, scale_t, meta_dicts, metas_masked = metas_to_ds(
-        meta_files,
-        max_dist,
-        min_dist,
-        opt,
-        old_scale=scale,
-        mask_energy=mask_energy,
-        oneway=oneway,
+        meta_files, max_dist, min_dist, opt, old_scale=scale, mask_energy=mask_energy
     )
     in_ds = mk_mols_ds(pdbs)
 

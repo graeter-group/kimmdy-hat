@@ -25,6 +25,8 @@ class HAT_reaction(ReactionPlugin):
             "h_cutoff": float,
             "frequency_factor": float,
             "polling_rate": int,
+            "model": str,   #TODO: default None
+            "enseble_size": int
         }
     }
 
@@ -32,6 +34,8 @@ class HAT_reaction(ReactionPlugin):
         super().__init__(*args, **kwargs)
 
         # Load model
+
+        if self.config.model is None:
         model_dirs = list(res_files("HATmodels").glob("[!_]*"))
         model_dir = model_dirs[0]
         tf_model_dir = list(model_dir.glob("*.tf"))[0]

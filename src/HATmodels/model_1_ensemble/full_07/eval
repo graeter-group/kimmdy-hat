@@ -1,0 +1,134 @@
+{
+  "loss": "MAE",
+  "lr_start": 0.0008,
+  "lr_scheduler": "cos",
+  "lr_fraction": 0.01,
+  "out_emb": "poi",
+  "mlp_style": "static",
+  "mlp_layers": 2,
+  "mlp_size": 128,
+  "mlp_rep": 1,
+  "depth": 2,
+  "equiv_norm": false,
+  "node_norm": false,
+  "pooling": "sum",
+  "epochs": 200,
+  "batchsize": 128,
+  "cache": "/hits/fast/mbm/riedmiki/nn/barrier_gnn_out/cache1",
+  "val_split": 0.1,
+  "scale": false,
+  "max_dist": null,
+  "min_dist": null,
+  "opt": false,
+  "datasets": "dataset_2208_synth dataset_2208_traj",
+  "date": "Fri Dec  9 16:45:45 2022",
+  "initial_epoch": 0,
+  "freeze_graph": false,
+  "new_mlp": false,
+  "eval_datasets": [
+    "dataset_2208_synth",
+    "dataset_2208_traj"
+  ]
+}
+{"mean_absolute_error": 4.134735902586309}
+##################
+{
+  "loss": "MAE",
+  "lr_start": 0.0008,
+  "lr_scheduler": "cos",
+  "lr_fraction": 0.01,
+  "out_emb": "poi",
+  "mlp_style": "static",
+  "mlp_layers": 2,
+  "mlp_size": 128,
+  "mlp_rep": 1,
+  "depth": 2,
+  "equiv_norm": false,
+  "node_norm": false,
+  "pooling": "sum",
+  "epochs": 200,
+  "batchsize": 128,
+  "cache": "/hits/fast/mbm/riedmiki/nn/barrier_gnn_out/cache1",
+  "val_split": 0.1,
+  "scale": false,
+  "max_dist": 3.0,
+  "min_dist": null,
+  "opt": false,
+  "datasets": "dataset_2208_synth dataset_2208_traj",
+  "date": "Fri Dec  9 16:45:45 2022",
+  "initial_epoch": 0,
+  "freeze_graph": false,
+  "new_mlp": false,
+  "eval_datasets": [
+    "dataset_2208_synth",
+    "dataset_2208_traj"
+  ]
+}
+{"mean_absolute_error": 3.6344492259740373}
+##################
+{
+  "loss": "MAE",
+  "lr_start": 0.0008,
+  "lr_scheduler": "cos",
+  "lr_fraction": 0.01,
+  "out_emb": "poi",
+  "mlp_style": "static",
+  "mlp_layers": 2,
+  "mlp_size": 128,
+  "mlp_rep": 1,
+  "depth": 2,
+  "equiv_norm": false,
+  "node_norm": false,
+  "pooling": "sum",
+  "epochs": 200,
+  "batchsize": 128,
+  "cache": "/hits/fast/mbm/riedmiki/nn/barrier_gnn_out/cache1",
+  "val_split": 0.1,
+  "scale": false,
+  "max_dist": 3.0,
+  "min_dist": null,
+  "opt": false,
+  "datasets": "dataset_2208_synth dataset_2208_traj",
+  "date": "Fri Dec  9 16:45:45 2022",
+  "initial_epoch": 0,
+  "freeze_graph": false,
+  "new_mlp": false,
+  "eval_datasets": [
+    "dataset_2208_traj"
+  ]
+}
+{"mean_absolute_error": 3.269690568988563}
+##################
+{
+  "loss": "MAE",
+  "lr_start": 0.0008,
+  "lr_scheduler": "cos",
+  "lr_fraction": 0.01,
+  "out_emb": "poi",
+  "mlp_style": "static",
+  "mlp_layers": 2,
+  "mlp_size": 128,
+  "mlp_rep": 1,
+  "depth": 2,
+  "equiv_norm": false,
+  "node_norm": false,
+  "pooling": "sum",
+  "epochs": 200,
+  "batchsize": 128,
+  "cache": "/hits/fast/mbm/riedmiki/nn/barrier_gnn_out/cache1",
+  "val_split": 0.1,
+  "scale": false,
+  "max_dist": 2.0,
+  "min_dist": null,
+  "opt": false,
+  "datasets": "dataset_2208_synth dataset_2208_traj",
+  "date": "Fri Dec  9 16:45:45 2022",
+  "initial_epoch": 0,
+  "freeze_graph": false,
+  "new_mlp": false,
+  "eval_datasets": [
+    "dataset_2208_traj"
+  ]
+}
+{"mean_absolute_error": 2.657945460548756}
+##################
