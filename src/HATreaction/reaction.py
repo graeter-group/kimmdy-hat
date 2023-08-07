@@ -1,123 +1,179 @@
 import json
 from importlib.resources import files as res_files
-from pathlib import Path
 import logging
 
 import MDAnalysis as MDA
 import numpy as np
 
 from HATreaction.utils.trajectory_utils import extract_subsystems, save_capped_systems
-from HATreaction.utils.input_generation import create_meta_dataset_predictions
+
 from HATreaction.utils.utils import find_radicals
-from kimmdy.reaction import ConversionRecipe, ConversionType, Reaction, ReactionResult
-from kimmdy.runmanager import RunManager
-from MDAnalysis.topology.guessers import guess_bonds
-from MDAnalysis.topology.tables import vdwradii
-from tensorflow.keras.models import Model, load_model
+from kimmdy.reaction import (
+    Move,
+    Recipe,
+    RecipeCollection,
+    ReactionPlugin,
+)
 
 
-class HAT_reaction(Reaction):
 
-    type_scheme = {"hat_reaction": {"h_cutoff": float, "freqfac": float}}
+class HAT_reaction(ReactionPlugin):
 
     def __init__(self, *args, **kwargs):
+        from tensorflow.keras.models import load_model
+        import tensorflow as tf
+        tf.get_logger().setLevel('ERROR')
+
         super().__init__(*args, **kwargs)
 
         # Load model
-        model_dirs = list(res_files("HATmodels").glob("[!_]*"))
-        model_dir = model_dirs[0]
-        tf_model_dir = list(model_dir.glob("*.tf"))[0]
-        self.model: Model = load_model(tf_model_dir)
 
-        # Get hparas
-        with open(model_dir / "hparas.json") as f:
-            self.hparas = json.load(f)
-
-        if self.hparas.get("scale"):
-            with open(model_dir / "scale", "r") as f:
-                self.mean, self.std = [float(l.strip()) for l in f.readlines()]
+        if getattr(self.config, "model", None) is None:
+            ens_glob = "[!_]*"
         else:
-            self.mean, self.std = [0.0, 1.0]
+            ens_glob = self.config.model
+
+        ensemble_dir = list(res_files("HATmodels").glob(ens_glob))[0]
+        ensemble_size = getattr(self.config, "enseble_size", None)
+        self.models = []
+        self.means = []
+        self.stds = []
+        self.hparas = {}
+        for model_dir in list(ensemble_dir.glob("*"))[slice(ensemble_size)]:
+
+            tf_model_dir = list(model_dir.glob("*.tf"))[0]
+            self.models.append(load_model(tf_model_dir))
+
+            with open(model_dir / "hparas.json") as f:
+                hpara = json.load(f)
+                self.hparas.update(hpara)
+
+            if hpara.get("scale"):
+                with open(model_dir / "scale", "r") as f:
+                    mean, std = [float(l.strip()) for l in f.readlines()]
+            else:
+                mean, std = [0.0, 1.0]
+            self.means.append(mean)
+            self.stds.append(std)
 
         self.h_cutoff = self.config.h_cutoff
         self.freqfac = self.config.frequency_factor
+        self.polling_rate = self.config.polling_rate
 
-    # def get_reaction_result(self, task_files, latest_files, config, radicals) -> ReactionResult:
-    def get_reaction_result(self, files) -> ReactionResult:
+    def get_recipe_collection(self, files) -> RecipeCollection:
+        
+        from HATreaction.utils.input_generation import create_meta_dataset_predictions
+
         tpr = str(files.input["tpr"])
         trr = str(files.input["trr"])
         u = MDA.Universe(str(tpr), str(trr))
 
+        se_dir = files.outputdir / "se"
+        # interp_dir = files.outputdir / "interp"
 
-        rad_idxs = self.runmng.radical_idxs
+        if getattr(self.config, "radicals", None) is not None:
+            rad_idxs = self.config.radicals
+        else:
+            rad_idxs = getattr(self.runmng, "radical_idxs", [])
         if len(rad_idxs) < 1:
             logging.info("No radicals known, searching in structure..")
             rad_idxs = [str(a[0].index) for a in find_radicals(u)]
         logging.info(f"Found radicals: {rad_idxs}")
-        # TODO: handle cases w/o radicals --> empty recipe
+        if len(rad_idxs) < 1:
+            logging.info(f"--> retuning empty recipe collection")
+            return RecipeCollection([])
 
         sub_atms = u.select_atoms(
-            f"not resname SOL NA CL and (around 20 index {' '.join([i for i in rad_idxs])})"
+            f"((not resname SOL NA CL) and (around 20 index {' '.join([i for i in rad_idxs])}))"
+            f" or index {' '.join([i for i in rad_idxs])}",
+            updating=True,
         )
-        sub_atms += u.select_atoms(f"index {' '.join([i for i in rad_idxs])}")
-        u_sub = MDA.Merge(sub_atms)
-        u_sub.load_new(trr, sub=sub_atms.indices)
 
-        # subuni has different indices, translate: WARNING: id 1-based!!!
-        rad_idxs_sub = list(
-            map(
-                str, u_sub.select_atoms(f"id {' '.join([i for i in rad_idxs])}").indices
+        # every 10 rate queries, update environment selection around radical
+        for ts in u.trajectory[:: self.polling_rate * 10]:
+            u_sub = MDA.Merge(sub_atms)
+            u_sub.load_new(str(trr), sub=sub_atms.indices)
+            sub_start_t = ts.frame
+            sub_end_t = ts.frame + self.polling_rate * 10
+
+            # subuni has different indices, translate: WARNING: id 1-based!!!
+            rad_idxs_sub = list(
+                map(
+                    str,
+                    u_sub.select_atoms(f"id {' '.join([i for i in rad_idxs])}").indices,
+                )
             )
-        )
 
-        # check manually w/ ngl:
-        if 0:
-            import nglview as ngl
+            # check manually w/ ngl:
+            if 0:
+                import nglview as ngl
 
-            view = ngl.show_mdanalysis(u_sub, defaultRepresentation=False)
-            view.representations = [
-                {"type": "ball+stick", "params": {"sele": ""}},
-                {"type": "spacefill", "params": {"sele": "", "radiusScale": 0.7}},
-            ]
-            view._set_selection("@" + ",".join(rad_idxs_sub), repr_index=1)
-            view.center()
-            view
+                view = ngl.show_mdanalysis(u_sub, defaultRepresentation=False)
+                view.representations = [
+                    {"type": "ball+stick", "params": {"sele": ""}},
+                    {"type": "spacefill", "params": {"sele": "", "radiusScale": 0.7}},
+                ]
+                view._set_selection("@" + ",".join(rad_idxs_sub), repr_index=1)
+                view.center()
+                view
 
-        se_dir = files.outputdir / "se"
-        interp_dir = files.outputdir / "interp"
-
-        save_capped_systems(  # maybe just keep in ram? optionally?
-            extract_subsystems(u_sub, rad_idxs_sub, h_cutoff=self.h_cutoff), se_dir
-        )
+            save_capped_systems(  # maybe just keep in ram? optionally?
+                extract_subsystems(
+                    u_sub,
+                    rad_idxs_sub,
+                    h_cutoff=self.h_cutoff,
+                    start=sub_start_t,
+                    stop=sub_end_t,
+                    step=self.polling_rate,
+                    unique=False,
+                ),
+                se_dir,
+            )
 
         in_ds, es, scale_t, meta_ds, metas_masked = create_meta_dataset_predictions(
             meta_files=list(se_dir.glob("*.npz")),
             batch_size=self.hparas["batchsize"],
             mask_energy=False,
+            oneway=True,
         )
 
-        # Run Model
+        # Make predictions
         ys = []
-        for x in in_ds:
-            ys.extend(self.model(x).numpy())
-        ys = np.concatenate(ys).astype(dtype=np.float64)
-        ys = (ys * self.std) + self.mean
+        for model, m, s in zip(self.models, self.means, self.stds):
+            y = model.predict(in_ds).squeeze()
+            ys.append((y * s) + m)
+        ys = np.stack(ys)
+        ys = np.mean(np.array(ys), 0)
 
-        results = ReactionResult()
-        
         # Rate
-        results.rates = list(np.multiply(self.freqfac, np.power(np.e, (-ys / 0.593))))
+        rates = list(np.multiply(self.freqfac, np.power(np.e, (-ys / 0.593))))
+        recipes = []
 
-        for sub_idxs in list(map(lambda d: d["indices"][0:2], meta_ds)):
+        for meta_d, rate in zip(meta_ds, rates):
+            sub_idxs = meta_d["indices"][0:2]
             idxs = [u_sub.select_atoms(f"index {sub_idx}").ids for sub_idx in sub_idxs]
             assert all(
                 [len(i) == 1 for i in idxs]
-            ), f"HAT atom index translation error! \n{meta_ds}"
-            idxs = [str(idx[0] + 1) for idx in idxs]
-            print(idxs)
+            ), f"HAT atom index translation error! \n{meta_d}"
+            # idxs = [idx[0] + 1 for idx in idxs] # one-based
+            idxs = [idx[0] for idx in idxs]  # zero-based
 
-            results.recipes.append(
-                ConversionRecipe(type=[ConversionType.MOVE], atom_idx=[idxs])
+            f1 = meta_d["frame"] - self.polling_rate
+            if f1 < 0:
+                f1 = 0
+            f2 = meta_d["frame"]
+            t1 = u.trajectory[f1].time
+            t2 = u.trajectory[f2].time
+
+            recipes.append(
+                Recipe(
+                    recipe_steps=[Move(ix_to_move=idxs[0], ix_to_bind=idxs[1])],
+                    rates=[rate],
+                    timespans=[[t1, t2]],
+                )
             )
 
-        return results
+        recipe_collection = RecipeCollection(recipes)
+        recipe_collection.aggregate_reactions()
+
+        return recipe_collection
