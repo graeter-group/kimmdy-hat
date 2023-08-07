@@ -17,6 +17,8 @@ class DummyRunmanager:
     config.reactions.Hat_reaction.h_cutoff = 3
     config.reactions.Hat_reaction.frequency_factor = 1e8
     config.reactions.Hat_reaction.polling_rate = 10
+    config.reactions.Hat_reaction.model = None
+    config.reactions.Hat_reaction.ensemble_size = None
     radical_idxs = []
 
 @pytest.fixture

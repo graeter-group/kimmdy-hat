@@ -6,7 +6,7 @@ import MDAnalysis as MDA
 import numpy as np
 
 from HATreaction.utils.trajectory_utils import extract_subsystems, save_capped_systems
-from HATreaction.utils.input_generation import create_meta_dataset_predictions
+
 from HATreaction.utils.utils import find_radicals
 from kimmdy.reaction import (
     Move,
@@ -15,48 +15,55 @@ from kimmdy.reaction import (
     ReactionPlugin,
 )
 
-from tensorflow.keras.models import Model, load_model
 
 
 class HAT_reaction(ReactionPlugin):
 
-    type_scheme = {
-        "hat_reaction": {
-            "h_cutoff": float,
-            "frequency_factor": float,
-            "polling_rate": int,
-            "model": str,   #TODO: default None
-            "enseble_size": int
-        }
-    }
-
     def __init__(self, *args, **kwargs):
+        from tensorflow.keras.models import load_model
+        import tensorflow as tf
+        tf.get_logger().setLevel('ERROR')
+
         super().__init__(*args, **kwargs)
 
         # Load model
 
-        if self.config.model is None:
-        model_dirs = list(res_files("HATmodels").glob("[!_]*"))
-        model_dir = model_dirs[0]
-        tf_model_dir = list(model_dir.glob("*.tf"))[0]
-        self.model: Model = load_model(tf_model_dir)
-
-        # Get hparas
-        with open(model_dir / "hparas.json") as f:
-            self.hparas = json.load(f)
-
-        if self.hparas.get("scale"):
-            with open(model_dir / "scale", "r") as f:
-                self.mean, self.std = [float(l.strip()) for l in f.readlines()]
+        if getattr(self.config, "model", None) is None:
+            ens_glob = "[!_]*"
         else:
-            self.mean, self.std = [0.0, 1.0]
+            ens_glob = self.config.model
+
+        ensemble_dir = list(res_files("HATmodels").glob(ens_glob))[0]
+        ensemble_size = getattr(self.config, "enseble_size", None)
+        self.models = []
+        self.means = []
+        self.stds = []
+        self.hparas = {}
+        for model_dir in list(ensemble_dir.glob("*"))[slice(ensemble_size)]:
+
+            tf_model_dir = list(model_dir.glob("*.tf"))[0]
+            self.models.append(load_model(tf_model_dir))
+
+            with open(model_dir / "hparas.json") as f:
+                hpara = json.load(f)
+                self.hparas.update(hpara)
+
+            if hpara.get("scale"):
+                with open(model_dir / "scale", "r") as f:
+                    mean, std = [float(l.strip()) for l in f.readlines()]
+            else:
+                mean, std = [0.0, 1.0]
+            self.means.append(mean)
+            self.stds.append(std)
 
         self.h_cutoff = self.config.h_cutoff
         self.freqfac = self.config.frequency_factor
         self.polling_rate = self.config.polling_rate
 
-    # def get_reaction_result(self, task_files, latest_files, config, radicals) -> ReactionResult:
     def get_recipe_collection(self, files) -> RecipeCollection:
+        
+        from HATreaction.utils.input_generation import create_meta_dataset_predictions
+
         tpr = str(files.input["tpr"])
         trr = str(files.input["trr"])
         u = MDA.Universe(str(tpr), str(trr))
@@ -64,12 +71,17 @@ class HAT_reaction(ReactionPlugin):
         se_dir = files.outputdir / "se"
         # interp_dir = files.outputdir / "interp"
 
-        rad_idxs = getattr(self.runmng, "radical_idxs", [])
+        if getattr(self.config, "radicals", None) is not None:
+            rad_idxs = self.config.radicals
+        else:
+            rad_idxs = getattr(self.runmng, "radical_idxs", [])
         if len(rad_idxs) < 1:
             logging.info("No radicals known, searching in structure..")
             rad_idxs = [str(a[0].index) for a in find_radicals(u)]
         logging.info(f"Found radicals: {rad_idxs}")
-        # TODO: handle cases w/o radicals --> empty recipe
+        if len(rad_idxs) < 1:
+            logging.info(f"--> retuning empty recipe collection")
+            return RecipeCollection([])
 
         sub_atms = u.select_atoms(
             f"((not resname SOL NA CL) and (around 20 index {' '.join([i for i in rad_idxs])}))"
@@ -126,9 +138,12 @@ class HAT_reaction(ReactionPlugin):
         )
 
         # Make predictions
-        ys = self.model.predict(in_ds)
-        ys = np.concatenate(ys).astype(dtype=float)
-        ys = (ys * self.std) + self.mean
+        ys = []
+        for model, m, s in zip(self.models, self.means, self.stds):
+            y = model.predict(in_ds).squeeze()
+            ys.append((y * s) + m)
+        ys = np.stack(ys)
+        ys = np.mean(np.array(ys), 0)
 
         # Rate
         rates = list(np.multiply(self.freqfac, np.power(np.e, (-ys / 0.593))))
@@ -141,8 +156,8 @@ class HAT_reaction(ReactionPlugin):
                 [len(i) == 1 for i in idxs]
             ), f"HAT atom index translation error! \n{meta_d}"
             # idxs = [idx[0] + 1 for idx in idxs] # one-based
-            idxs = [idx[0] for idx in idxs] # zero-based
-            
+            idxs = [idx[0] for idx in idxs]  # zero-based
+
             f1 = meta_d["frame"] - self.polling_rate
             if f1 < 0:
                 f1 = 0

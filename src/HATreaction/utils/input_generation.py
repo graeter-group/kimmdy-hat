@@ -12,7 +12,7 @@ from tqdm import tqdm
 import pandas as pd
 
 # KGCNN==2.1.0, tensorflow==2.10.0
-version = 0.3  # Also used in HATreaction pluginversion
+version = 0.4  # Also used in HATreaction pluginversion
 
 
 def _preproc_pdb(pdbs):
@@ -117,7 +117,14 @@ def mk_mols_ds(pdb_pairs):
 
 
 def metas_to_ds(
-    meta_files, max_dist, min_dist, opt, scale=False, old_scale=None, mask_energy=True
+    meta_files,
+    max_dist,
+    min_dist,
+    opt,
+    scale=False,
+    old_scale=None,
+    mask_energy=True,
+    oneway=False,
 ):
     # Load energies
     meta_dicts1 = []
@@ -177,12 +184,17 @@ def metas_to_ds(
         energies1.append(np.NaN)
         energies2.append(np.NaN)
 
-    pdbs2 = [(j, i) for i, j in pdbs1]
-
-    energies = np.array(energies1 + energies2, dtype=np.float64)
-    pdbs = np.array(pdbs1 + pdbs2, dtype=str)
-    meta_dicts = np.array(meta_dicts1 + meta_dicts2)
-    metas_masked = np.array(meta_files + meta_files)
+    if oneway:
+        pdbs = np.array(pdbs1, dtype=str)
+        energies = np.array(energies1, dtype=float)
+        meta_dicts = np.array(meta_dicts1)
+        metas_masked = np.array(meta_files)
+    else:
+        pdbs2 = [(j, i) for i, j in pdbs1]
+        pdbs = np.array(pdbs1 + pdbs2, dtype=str)
+        energies = np.array(energies1 + energies2, dtype=float)
+        meta_dicts = np.array(meta_dicts1 + meta_dicts2)
+        metas_masked = np.array(meta_files + meta_files)
     mask = np.logical_not(np.isnan(energies))
 
     if mask_energy:
@@ -380,6 +392,7 @@ def create_meta_dataset_predictions(
     opt=False,
     descriptors=None,
     mask_energy=True,
+    oneway=False,
 ):
     """Analogue to create_meta_dataset, but returns inputs and energies separate
 
@@ -420,7 +433,13 @@ def create_meta_dataset_predictions(
     """
 
     energies, pdbs, scale_t, meta_dicts, metas_masked = metas_to_ds(
-        meta_files, max_dist, min_dist, opt, old_scale=scale, mask_energy=mask_energy
+        meta_files,
+        max_dist,
+        min_dist,
+        opt,
+        old_scale=scale,
+        mask_energy=mask_energy,
+        oneway=oneway,
     )
     in_ds = mk_mols_ds(pdbs)
 

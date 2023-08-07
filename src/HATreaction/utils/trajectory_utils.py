@@ -4,7 +4,7 @@ from pathlib import Path
 from MDAnalysis.coordinates.XTC import XTCReader
 from MDAnalysis.analysis.distances import self_distance_array
 
-import MDAnalysis as MDA
+import MDAnalysis as mda
 import numpy as np
 import random
 from scipy.spatial.transform import Rotation
@@ -13,20 +13,20 @@ from tqdm.autonotebook import tqdm
 from HATreaction.utils.utils import check_cylinderclash
 import logging
 
-version = 0.4
+version = 0.5
 
 
 def find_radical_pos(
-    center: MDA.core.groups.Atom,
-    bonded: MDA.core.groups.AtomGroup,
+    center: mda.core.groups.Atom,
+    bonded: mda.core.groups.AtomGroup,
 ):
     """Calculates possible radical positions of a given radical atom
 
     Parameters
     ----------
-    center : MDA.core.groups.Atom
+    center : mda.core.groups.Atom
         Radical atom
-    bonded : MDA.core.groups.AtomGroup
+    bonded : mda.core.groups.AtomGroup
         Atom group of bonded atoms. From its length the geometry is predicted.
     tetrahedral : bool
         Whether to assume a tetrahedral conformation around C and N
@@ -111,7 +111,7 @@ def find_radical_pos(
         return ends
 
     else:
-        raise ValueError(f"Weired count of bonds: {list(bonded)}\nCorrect radicals?")
+        raise ValueError(f"Weired count of bonds: {list(bonded)}\n\tCorrect radicals?")
 
 
 def get_residue(atm):
@@ -120,12 +120,12 @@ def get_residue(atm):
 
     Parameters
     ----------
-    atm : MDA.core.groups.Atom
+    atm : mda.core.groups.Atom
         Starting atom
 
     Returns
     -------
-    MDA.AtomGroup
+    mda.AtomGroup
         Residue
     """
     resid = atm.resid
@@ -153,7 +153,7 @@ def get_res_union(atms):
 
     Parameters
     ----------
-    atms : MDA.core.groups.Atom
+    atms : mda.core.groups.Atom
         Atoms which residues will be unionized.
     """
     res = atms[0].universe.atoms[[]]
@@ -180,12 +180,12 @@ def cap_aa(atms):
 
     Parameters
     ----------
-    atms : MDA.AtomGroup
+    atms : mda.AtomGroup
         All atoms of the aminoacid(s) to cap.
 
     Returns
     -------
-    MDA.AtomGroup
+    mda.AtomGroup
         Capping atoms. Should be used as union with the
         aminoacid residue as capping occures outside this residue.
     List[int]
@@ -234,7 +234,7 @@ def cap_aa(atms):
                     continue  # next aminoacid included, no need to cap
                 if cap_d["N"].resnames[0] == "NME":  # include existing cap
                     cap = cap_d["N"][0].residue.atoms
-                    u_cap = MDA.core.universe.Merge(cap)
+                    u_cap = mda.core.universe.Merge(cap)
                     cap_atms.append(u_cap.atoms)
                     [cap_ix.append(i) for i in cap.ix]
                     continue
@@ -250,7 +250,7 @@ def cap_aa(atms):
                 cap = sum([cap_d[k] for k in ["C", "C_H3"]])
                 h_idxs = (1, 2, 3)
                 # make new universe with fixed order
-                u_cap = MDA.core.universe.Merge(cap)
+                u_cap = mda.core.universe.Merge(cap)
                 u_cap.residues[0].resname = "MEY"
 
             elif pe.name in special_ends["LY2"] + special_ends["LY3"]:
@@ -288,25 +288,43 @@ def cap_aa(atms):
                 h_idxs = (0, 1, 2, 3)
 
                 # make new universe with fixed order
-                u_cap = MDA.core.universe.Merge(cap)
+                u_cap = mda.core.universe.Merge(cap)
                 u_cap.residues[0].resname = "LYX"
 
             else:  # Standard capping
                 # Special treatment if single AA is in between:
                 # Build Gly linker
                 linker = False
-                if (cap_d["N"][0].resindex - pe.resindex) + cap_d["N"][
-                    0
-                ].resindex in atms.resindices:
-                    if abs(cap_d["N"][0].resindex - pe.resindex) == 1:
-                        # should be fine to convert crosslinks?!
-                        # if cap_d["N"][0].resname not in ["L4Y", "L5Y"]:
-                        linker = True
+                # one apart:
+                if abs(cap_d["N"][0].resindex - pe.resindex) == 1:
+                    # pe-linker-rad? can be mirrored, rad must be in atms
+                    if (cap_d["N"][0].resindex - pe.resindex) + cap_d["N"][
+                        0
+                    ].resindex in atms.resindices:
+                        # backbone must be intact for linking
+                        if (
+                            len(cap_d["N"][0].residue.atoms.select_atoms("backbone"))
+                            == 4
+                        ):
+                            linker = True
+                        else:
+                            logging.debug("Broken backbone in capping AA detected!")
 
                 N_alphas = env.select_atoms(
                     f"((bonded index {cap_d['N'][0].ix}) and (resid {cap_d['N'][0].resid})) or ((bonded index {cap_d['N'][0].ix}) and name H)"
                 )
-                ref = env.select_atoms(f"(bonded index {cap_d['N'][0].ix})")
+
+                # broken bond after N:
+                if len(N_alphas) != 2:
+                    logging.info(
+                        f"Capping group contains radical next to N!\n\t"
+                        f"pe: {pe}\n\tN_alphas: {list(N_alphas)}"
+                    )
+                    cap = cap_d["N"] + N_alphas
+                    u_cap = mda.core.universe.Merge(cap)
+                    cap_atms.append(u_cap.atoms)
+                    [cap_ix.append(i) for i in cap.ix]
+                    continue
 
                 # C_a --> CH3,
                 # everything w/ more or less than 1 H attached --> H
@@ -319,33 +337,39 @@ def cap_aa(atms):
 
                 assert all(
                     [k in cap_d.keys() for k in ["N_C", "N_H"]]
-                ), f"ERROR while building capping group on C-term!\nAtom:{cap_d['N'][0]}"
+                ), f"ERROR while building capping group on C-term!\n\tAtom:{cap_d['N'][0]}"
 
                 if not linker:
                     cap_d["NC_3H"] = cap_d["N_C"].bonded_atoms - cap_d["N"]
-                    assert (
-                        len(cap_d["NC_3H"]) == 3
-                    ), f"CAPPING ERROR: Atom {cap_d['N'][0]}"
-
+                    # if broken bond after C_a
+                    if len(cap_d["NC_3H"]) != 3:
+                        logging.info(
+                            f"Capping group contains radical next to Calpha!\n\t"
+                            f"pe: {pe}\n\tC_a_alphas: {list(cap_d['NC_3H'])}"
+                        )
                     cap = sum([cap_d[k] for k in ["N", "N_H", "N_C", "NC_3H"]])
-                    h_idxs = (1, 3, 4, 5)
+                    # h_idxs usually: (1,3,4,5) for conversion into H
+                    h_idxs = [1]
+                    h_idxs += list(range(3, 3 + len(cap_d["NC_3H"])))
 
                     # make new universe with fixed order
-                    u_cap = MDA.core.universe.Merge(cap)
+                    u_cap = mda.core.universe.Merge(cap)
                     u_cap.residues[0].resname = "NME"
 
                 else:  # LINKER:
                     cap_d["bb"] = cap_d["N"][0].residue.atoms.select_atoms("backbone")
                     assert (
                         len(cap_d["bb"]) == 4
-                    ), f"CAPPING ERROR in linker: backbone {cap_d['N'][0]}"
+                    ), (
+                        breakpoint()
+                    )  # f"CAPPING ERROR in linker: backbone {cap_d['N'][0]}"
                     cap_d["NC_2H"] = cap_d["N_C"].bonded_atoms - cap_d["bb"]
 
                     cap = sum([cap_d[k] for k in ["N_H", "NC_2H", "bb"]])
                     h_idxs = (0, 1, 2)
 
                     # make new universe with fixed order
-                    u_cap = MDA.core.universe.Merge(cap)
+                    u_cap = mda.core.universe.Merge(cap)
                     u_cap.residues[0].resname = "GLY"
 
             _scale_and_mutate(u_cap, h_idxs)
@@ -370,19 +394,20 @@ def cap_aa(atms):
                 continue  # next aminoacid included, no need to cap
             if cap_d["C"].resnames[0] == "ACE":  # include existing cap
                 cap = cap_d["C"][0].residue.atoms
-                u_cap = MDA.core.universe.Merge(cap)
+                u_cap = mda.core.universe.Merge(cap)
                 cap_atms.append(u_cap.atoms)
                 [cap_ix.append(i) for i in cap.ix]
                 continue
 
             # skip if linker AA, always build from C term
-            if (cap_d["C"][0].resindex - pe.resindex) + cap_d["C"][
-                0
-            ].resindex in atms.resindices:
-                if abs(cap_d["C"][0].resindex - pe.resindex) == 1:
-                    # should be fine to convert crosslinks?!
-                    # if cap_d["C"][0].resname not in ["L4Y", "L5Y"]:
-                    continue
+            if abs(cap_d["C"][0].resindex - pe.resindex) == 1:
+                # pe-linker-rad? can be mirrored, rad must be in atms
+                if (cap_d["C"][0].resindex - pe.resindex) + cap_d["C"][
+                    0
+                ].resindex in atms.resindices:
+                    # backbone must be intact for linking
+                    if len(cap_d["C"][0].residue.atoms.select_atoms("backbone")) == 4:
+                        continue
 
             C_alphas = env.select_atoms(
                 f"(bonded index {cap_d['C'][0].ix}) and (resid {cap_d['C'][0].resid})"
@@ -415,24 +440,37 @@ def cap_aa(atms):
                 h_idxs = (1, 2, 4, 5, 7)
 
                 # make new universe with fixed order
-                u_cap = MDA.core.universe.Merge(cap)
+                u_cap = mda.core.universe.Merge(cap)
                 u_cap.residues[0].resname = "ETH"
 
             else:  # Standard capping:
-                assert (
-                    len(C_alphas) == 2
-                ), f"ERROR while building capping group on N-term!\nAtom:{cap_d['C'][0]}"
+                # if broken bond after C:
+                if len(C_alphas) != 2:
+                    logging.info(
+                        f"Capping group contains radical next to C!\n\t"
+                        f"pe: {pe}\n\tC_alphas: {list(C_alphas)}"
+                    )
+                    cap = cap_d["C"] + C_alphas
+                    u_cap = mda.core.universe.Merge(cap)
+                    cap_atms.append(u_cap.atoms)
+                    [cap_ix.append(i) for i in cap.ix]
+                    continue
 
                 cap_d["O"] = filter(lambda a: a.element == "O", C_alphas).__next__()
                 cap_d["CC"] = (C_alphas - cap_d["O"])[0]
 
                 cap_d["CC_H3"] = cap_d["CC"].bonded_atoms - cap_d["C"]
-
+                if len(cap_d["CC_H3"]) != 3:
+                    logging.info(
+                        f"Capping group contains radical next to Calpha!\n\t"
+                        f"pe: {pe}\n\tC_a_alphas: {list(cap_d['CC_H3'])}"
+                    )
                 cap = sum([cap_d[k] for k in ["C", "O", "CC", "CC_H3"]])
-                h_idxs = (3, 4, 5)
+                # h_idxs usually: (3,4,5) for conversion into H
+                h_idxs = list(range(3, 3 + len(cap_d["CC_H3"])))
 
                 # make new universe with fixed order
-                u_cap = MDA.core.universe.Merge(cap)
+                u_cap = mda.core.universe.Merge(cap)
                 u_cap.residues[0].resname = "ACE"
 
             _scale_and_mutate(u_cap, h_idxs)
@@ -440,9 +478,9 @@ def cap_aa(atms):
             [cap_ix.append(i) for i in cap.ix]
 
     if len(cap_atms) == 0:
-        cap = MDA.Universe.empty(0).atoms
+        cap = mda.Universe.empty(0).atoms
     else:
-        cap = MDA.core.universe.Merge(*cap_atms).atoms
+        cap = mda.core.universe.Merge(*cap_atms).atoms
 
     return cap, cap_ix
 
@@ -496,13 +534,13 @@ def cap_single_rad(u, ts, rad, bonded_rad, h_cutoff=3, env_cutoff=7):
 
     Parameters
     ----------
-    u : MDA.Universe
+    u : mda.Universe
         Main universe
-    ts : MDAnalysis.coordinates.base.Timestep
+    ts : mdanalysis.coordinates.base.Timestep
         On which timestep to operate
-    rad : MDA.AtomGroup
+    rad : mda.AtomGroup
         Radical atom in its own group
-    bonded_rad : MDA.AtomGroup
+    bonded_rad : mda.AtomGroup
         AtomGroup containing all atoms bonded to the radical
     h_cutoff : float, optional
         Cutoff radius for hydrogen search around radical, by default 3
@@ -518,7 +556,7 @@ def cap_single_rad(u, ts, rad, bonded_rad, h_cutoff=3, env_cutoff=7):
     env = u.atoms.select_atoms(
         f"point { str(rad.positions).strip('[ ]') } {env_cutoff}"
     )
-    # ts2 = MDA.transformations.unwrap(env)(ts)
+    # ts2 = mda.transformations.unwrap(env)(ts)
     env.unwrap()
 
     end_poss = find_radical_pos(rad[0], bonded_rad)
@@ -587,13 +625,13 @@ def cap_single_rad(u, ts, rad, bonded_rad, h_cutoff=3, env_cutoff=7):
             charge_correction += 1
 
         capped_systems[h_idx] = {
-            "start_u": MDA.core.universe.Merge(
+            "start_u": mda.core.universe.Merge(
                 h,
                 rad,
                 caps,
                 core,
             ),
-            "end_u": MDA.core.universe.Merge(
+            "end_u": mda.core.universe.Merge(
                 h,
                 rad,
                 caps,
@@ -646,7 +684,7 @@ def extract_subsystems(
 
     Parameters
     ----------
-    u : MDA.Universe
+    u : mda.Universe
         Main universe
     rad_idxs : List[int]
         Indices of the two radical atoms
@@ -768,7 +806,7 @@ def save_capped_systems(systems, out_dir):
 
 
 def make_radicals(
-    u: MDA.Universe,
+    u: mda.Universe,
     xtc,
     count,
     start=None,
@@ -786,7 +824,7 @@ def make_radicals(
 
     Parameters
     ----------
-    u : MDA.Universe
+    u : mda.Universe
     xtc : Path
     count : int
         How many radicals to generate. Universes will be build one after the other.
@@ -830,7 +868,7 @@ def make_radicals(
         # remove one H and reorder atoms
         sub_atoms = rad + (all_H - sel_H) + (all_heavy - rad)
 
-        u_radical = MDA.Merge(sub_atoms)
+        u_radical = mda.Merge(sub_atoms)
         u_radical.load_new(str(xtc), format=XTCReader, sub=sub_atoms.indices)
 
         try:
@@ -864,7 +902,7 @@ def closest(l, K):
 
 
 def make_radicals_smart(
-    u: MDA.Universe,
+    u: mda.Universe,
     xtc,
     count,
     start=None,
@@ -882,7 +920,7 @@ def make_radicals_smart(
 
     Parameters
     ----------
-    u : MDA.Universe
+    u : mda.Universe
     xtc : Path
     count : int
         How many radicals to generate. Universes will be build one after the other.
@@ -958,7 +996,7 @@ def make_radicals_smart(
         # remove one H and reorder atoms
         sub_atoms = rad + (all_Hs - sel_H) + (all_heavy - rad)
 
-        u_radical = MDA.Merge(sub_atoms)
+        u_radical = mda.Merge(sub_atoms)
         u_radical.load_new(str(xtc), format=XTCReader, sub=sub_atoms.indices)
 
         try:

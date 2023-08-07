@@ -1,0 +1,48 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "$id": "hat_reaction-config",
+    "description": "Settings for HAT reaction plugin",
+    "additionalProperties": false,
+    "properties": {
+      "frequency_factor": {
+        "type": "float",
+        "description": "Frequency factor",
+        "pytype": "float",
+        "default": 1,
+        "minimum": 1
+      },
+      "h_cutoff": {
+        "type": "float",
+        "description": "Cutoff for H atom",
+        "pytype": "float",
+        "default": 3
+      },
+      "model": {
+        "type": "string",
+        "description": "Model name, optional",
+        "pytype": "str",
+        "default": null
+      },
+      "ensemble_size": {
+        "type": "integer",
+        "description": "Number of models to use, defaults to all, optional",
+        "pytype": "int",
+        "default": null
+      },
+      "polling_rate": {
+        "type": "integer",
+        "description": "Polling rate, defaults to 10",
+        "pytype": "int",
+        "default": 10
+      },
+      "radicals": {
+        "type": "integer",
+        "description": "Radical index, usually supplied through kimmdy, optional",
+        "pytype": "int",
+        "default": null
+      }
+    },
+    "required": [  ]
+  }
+    

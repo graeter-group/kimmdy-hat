@@ -1,4 +1,4 @@
-import MDAnalysis as MDA
+import MDAnalysis as mda
 import numpy as np
 
 def find_radicals(u):
@@ -20,9 +20,7 @@ def find_radicals(u):
         except IndexError:
             raise IndexError("{} not in atomtype dictionary nbonds_dict".format(atom.type))
         if len(atom.bonded_atoms) < nbonds:
-            atoms.append(MDA.AtomGroup([atom]))
-    if len(atoms) == 0:
-        return [MDA.Universe.empty(0).atoms]
+            atoms.append(mda.AtomGroup([atom]))
     return atoms 
 
 
