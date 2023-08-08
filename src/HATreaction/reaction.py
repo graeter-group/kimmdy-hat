@@ -16,13 +16,12 @@ from kimmdy.reaction import (
 )
 
 
-
 class HAT_reaction(ReactionPlugin):
-
     def __init__(self, *args, **kwargs):
         from tensorflow.keras.models import load_model
         import tensorflow as tf
-        tf.get_logger().setLevel('ERROR')
+
+        tf.get_logger().setLevel("ERROR")
 
         super().__init__(*args, **kwargs)
 
@@ -40,7 +39,6 @@ class HAT_reaction(ReactionPlugin):
         self.stds = []
         self.hparas = {}
         for model_dir in list(ensemble_dir.glob("*"))[slice(ensemble_size)]:
-
             tf_model_dir = list(model_dir.glob("*.tf"))[0]
             self.models.append(load_model(tf_model_dir))
 
@@ -61,7 +59,6 @@ class HAT_reaction(ReactionPlugin):
         self.polling_rate = self.config.polling_rate
 
     def get_recipe_collection(self, files) -> RecipeCollection:
-        
         from HATreaction.utils.input_generation import create_meta_dataset_predictions
 
         tpr = str(files.input["tpr"])
