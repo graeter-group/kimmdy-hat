@@ -1,8 +1,6 @@
 #%%
 from pathlib import Path
 from HATreaction import HAT_reaction
-import pickle
-import json
 import pytest
 from pprint import pprint
 

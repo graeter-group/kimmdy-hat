@@ -15,14 +15,11 @@ from kimmdy.reaction import (
     ReactionPlugin,
 )
 
-
 class HAT_reaction(ReactionPlugin):
     def __init__(self, *args, **kwargs):
-        from tensorflow.keras.models import load_model
+        logging.getLogger("tensorflow").setLevel("CRITICAL")
         import tensorflow as tf
-
-        tf.get_logger().setLevel("ERROR")
-
+        from tensorflow.keras.models import load_model
         super().__init__(*args, **kwargs)
 
         # Load model
