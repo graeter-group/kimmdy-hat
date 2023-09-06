@@ -3,10 +3,11 @@ from pathlib import Path
 from HATreaction import HAT_reaction
 import pytest
 from pprint import pprint
+import logging
 
 #%%
 class DummyClass:
-    pass
+    logger = logging.getLogger()
 
 class DummyRunmanager:
     config = DummyClass()
@@ -35,8 +36,18 @@ def recipe_collection(tmpdir):
 
 def test_traj_to_recipes(recipe_collection):
     
-    assert len(recipe_collection.recipes) == 5
+    assert len(recipe_collection.recipes) == 15
     recipe_collection.aggregate_reactions()
+    assert len(recipe_collection.recipes) == 15
+    
+    for recipe in recipe_collection.recipes:
+        assert len(recipe.rates) == 1
+        assert len(recipe.timespans) == 1
+
+    # remove 'place'
+    [r.recipe_steps.pop(1) for r in recipe_collection.recipes]
+    recipe_collection.aggregate_reactions()
+
     assert len(recipe_collection.recipes) == 5
     
     for recipe in recipe_collection.recipes:

@@ -8,18 +8,16 @@ import numpy as np
 from HATreaction.utils.trajectory_utils import extract_subsystems, save_capped_systems
 
 from HATreaction.utils.utils import find_radicals
-from kimmdy.reaction import (
-    Move,
-    Recipe,
-    RecipeCollection,
-    ReactionPlugin,
-)
+from kimmdy.recipe import Bind, Break, Place, Relax, Recipe, RecipeCollection
+from kimmdy.plugins import ReactionPlugin
+
 
 class HAT_reaction(ReactionPlugin):
     def __init__(self, *args, **kwargs):
         logging.getLogger("tensorflow").setLevel("CRITICAL")
         import tensorflow as tf
         from tensorflow.keras.models import load_model
+
         super().__init__(*args, **kwargs)
 
         # Load model
@@ -58,6 +56,9 @@ class HAT_reaction(ReactionPlugin):
     def get_recipe_collection(self, files) -> RecipeCollection:
         from HATreaction.utils.input_generation import create_meta_dataset_predictions
 
+        logger = files.logger
+        logger.debug("Getting recipe for reaction: homolysis")
+
         tpr = str(files.input["tpr"])
         trr = str(files.input["trr"])
         u = MDA.Universe(str(tpr), str(trr))
@@ -70,11 +71,11 @@ class HAT_reaction(ReactionPlugin):
         else:
             rad_idxs = getattr(self.runmng, "radical_idxs", [])
         if len(rad_idxs) < 1:
-            logging.info("No radicals known, searching in structure..")
+            logger.info("No radicals known, searching in structure..")
             rad_idxs = [str(a[0].index) for a in find_radicals(u)]
-        logging.info(f"Found radicals: {rad_idxs}")
+        logger.info(f"Found radicals: {rad_idxs}")
         if len(rad_idxs) < 1:
-            logging.info(f"--> retuning empty recipe collection")
+            logger.info(f"--> retuning empty recipe collection")
             return RecipeCollection([])
 
         sub_atms = u.select_atoms(
@@ -150,7 +151,7 @@ class HAT_reaction(ReactionPlugin):
                 [len(i) == 1 for i in idxs]
             ), f"HAT atom index translation error! \n{meta_d}"
             # idxs = [idx[0] + 1 for idx in idxs] # one-based
-            idxs = [idx[0] for idx in idxs]  # zero-based
+            idxs = [int(idx[0]) for idx in idxs]  # zero-based
 
             f1 = meta_d["frame"] - self.polling_rate
             if f1 < 0:
@@ -158,16 +159,36 @@ class HAT_reaction(ReactionPlugin):
             f2 = meta_d["frame"]
             t1 = u.trajectory[f1].time
             t2 = u.trajectory[f2].time
+            old_bound = int(u.select_atoms(f"bonded index {idxs[0]}")[0].index)
 
+            # get end position
+            pdb_e = meta_d["meta_path"].with_name(meta_d["meta_path"].stem + "_2.pdb")
+            with open(pdb_e) as f:
+                finished = False
+                while not finished:
+                    line = f.readline()
+                    if line[:11] == "ATOM      1":
+                        finished = True
+                        x = float(line[30:38].strip())
+                        y = float(line[38:46].strip())
+                        z = float(line[46:54].strip())
+
+            # make recipe
             recipes.append(
                 Recipe(
-                    recipe_steps=[Move(ix_to_move=idxs[0], ix_to_bind=idxs[1])],
+                    recipe_steps=[
+                        Break(old_bound, idxs[0]),
+                        Place(ix_to_place=idxs[0], new_coords=[x, y, z]),
+                        Bind(idxs[0], idxs[1]),
+                        Relax(),
+                    ],
+                    # recipe_steps=[Move(ix_to_move=idxs[0], ix_to_bind=idxs[1])],
                     rates=[rate],
                     timespans=[[t1, t2]],
                 )
             )
 
         recipe_collection = RecipeCollection(recipes)
-        recipe_collection.aggregate_reactions()
+        # recipe_collection.aggregate_reactions() # useless with Place
 
         return recipe_collection
