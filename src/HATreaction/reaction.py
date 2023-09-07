@@ -99,6 +99,11 @@ class HAT_reaction(ReactionPlugin):
                 )
             )
 
+            for r_s, r in zip(rad_idxs_sub, rad_idxs):
+                assert list(u_sub.atoms[int(r_s)].bonded_atoms.names) == list(
+                    u.atoms[int(r)].bonded_atoms.names
+                )
+
             # check manually w/ ngl:
             if 0:
                 import nglview as ngl
@@ -173,20 +178,21 @@ class HAT_reaction(ReactionPlugin):
                         y = float(line[38:46].strip())
                         z = float(line[46:54].strip())
 
-            # make recipe
-            recipes.append(
-                Recipe(
-                    recipe_steps=[
-                        Break(old_bound, idxs[0]),
-                        Place(ix_to_place=idxs[0], new_coords=[x, y, z]),
-                        Bind(idxs[0], idxs[1]),
-                        Relax(),
-                    ],
-                    # recipe_steps=[Move(ix_to_move=idxs[0], ix_to_bind=idxs[1])],
-                    rates=[rate],
-                    timespans=[[t1, t2]],
+            if self.config.change_coords == "place":
+                seq = [
+                    Break(old_bound, idxs[0]),
+                    Place(ix_to_place=idxs[0], new_coords=[x, y, z]),
+                    Bind(idxs[0], idxs[1]),
+                ]
+            elif self.config.change_coords == "lambda":
+                seq = [Break(old_bound, idxs[0]), Bind(idxs[0], idxs[1]), Relax()]
+            else:
+                raise ValueError(
+                    f"Unknown change_coords parameter {self.config.change_coords}"
                 )
-            )
+
+            # make recipe
+            recipes.append(Recipe(recipe_steps=seq, rates=[rate], timespans=[[t1, t2]]))
 
         recipe_collection = RecipeCollection(recipes)
         # recipe_collection.aggregate_reactions() # useless with Place

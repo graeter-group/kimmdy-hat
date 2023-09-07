@@ -9,7 +9,6 @@
         "type": "float",
         "description": "Frequency factor",
         "pytype": "float",
-        "default": 1,
         "minimum": 1
       },
       "h_cutoff": {
@@ -41,8 +40,15 @@
         "description": "Radical index, usually supplied through kimmdy, optional",
         "pytype": "int",
         "default": null
+      },
+      "change_coords": {
+        "type": "string",
+        "description": "How to change coordinates. H can be placed at the new position, or a (lambda)-dynamics simulation can be performed. For lambda-dynamics, set up the coordinate changer with slow_growth=True",
+        "pytype": "str",
+        "enum": ["place","lambda"],
+        "default": "place"
       }
     },
-    "required": [  ]
+    "required": ["frequency_factor"]
   }
     

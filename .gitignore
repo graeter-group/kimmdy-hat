@@ -1,5 +1,6 @@
 tmp/
 tests/**/.*
+example/**
 
 # editors / tooling
 .vscode
