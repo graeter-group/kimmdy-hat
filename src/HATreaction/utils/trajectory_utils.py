@@ -717,7 +717,7 @@ def extract_subsystems(
         for c in combs:
             try:
                 u.delete_bonds([c])
-            except ValueError as e:
+            except ValueError:
                 continue
 
     print("Calculating radical neighbors..")

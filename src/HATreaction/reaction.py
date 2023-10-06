@@ -11,11 +11,14 @@ from HATreaction.utils.utils import find_radicals
 from kimmdy.recipe import Bind, Break, Place, Relax, Recipe, RecipeCollection
 from kimmdy.plugins import ReactionPlugin
 
+from pprint import pformat
+
 
 class HAT_reaction(ReactionPlugin):
     def __init__(self, *args, **kwargs):
         logging.getLogger("tensorflow").setLevel("CRITICAL")
         import tensorflow as tf
+        logging.getLogger("tensorflow").setLevel("CRITICAL")
         from tensorflow.keras.models import load_model
 
         super().__init__(*args, **kwargs)
@@ -71,13 +74,12 @@ class HAT_reaction(ReactionPlugin):
         else:
             rad_idxs = getattr(self.runmng, "radical_idxs", [])
         if len(rad_idxs) < 1:
-            logger.info("No radicals known, searching in structure..")
+            logger.debug("No radicals known, searching in structure..")
             rad_idxs = [str(a[0].index) for a in find_radicals(u)]
-        logger.info(f"Found radicals: {rad_idxs}")
+        logger.info(f"Found radicals: {len(rad_idxs)}")
         if len(rad_idxs) < 1:
-            logger.info(f"--> retuning empty recipe collection")
+            logger.info("--> retuning empty recipe collection")
             return RecipeCollection([])
-
         sub_atms = u.select_atoms(
             f"((not resname SOL NA CL) and (around 20 index {' '.join([i for i in rad_idxs])}))"
             f" or index {' '.join([i for i in rad_idxs])}",
@@ -117,18 +119,17 @@ class HAT_reaction(ReactionPlugin):
                 view.center()
                 view
 
-            save_capped_systems(  # maybe just keep in ram? optionally?
-                extract_subsystems(
-                    u_sub,
-                    rad_idxs_sub,
-                    h_cutoff=self.h_cutoff,
-                    start=sub_start_t,
-                    stop=sub_end_t,
-                    step=self.polling_rate,
-                    unique=False,
-                ),
-                se_dir,
+            subsystems = extract_subsystems(
+                u_sub,
+                rad_idxs_sub,
+                h_cutoff=self.h_cutoff,
+                start=sub_start_t,
+                stop=sub_end_t,
+                step=self.polling_rate,
+                unique=False,
             )
+            # maybe just keep in ram? optionally?
+            save_capped_systems(subsystems, se_dir)
 
         in_ds, es, scale_t, meta_ds, metas_masked = create_meta_dataset_predictions(
             meta_files=list(se_dir.glob("*.npz")),
@@ -145,10 +146,12 @@ class HAT_reaction(ReactionPlugin):
         ys = np.stack(ys)
         ys = np.mean(np.array(ys), 0)
 
-        # Rate
-        rates = list(np.multiply(self.freqfac, np.power(np.e, (-ys / 0.593))))
+        # Rate; RT=0.593
+        rates = list(np.multiply(self.freqfac, np.float_power(np.e, (-ys / 0.593))))
         recipes = []
-
+        logger.debug(f"Barriers:\n{pformat(ys)}")
+        logger.info(f"Max Rate: {max(rates)}, predicted {len(rates)} rates")
+        logger.debug(f"Rates:\n{pformat(rates)}")
         for meta_d, rate in zip(meta_ds, rates):
             sub_idxs = meta_d["indices"][0:2]
             idxs = [u_sub.select_atoms(f"index {sub_idx}").ids for sub_idx in sub_idxs]
@@ -158,10 +161,10 @@ class HAT_reaction(ReactionPlugin):
             # idxs = [idx[0] + 1 for idx in idxs] # one-based
             idxs = [int(idx[0]) for idx in idxs]  # zero-based
 
-            f1 = meta_d["frame"] - self.polling_rate
-            if f1 < 0:
-                f1 = 0
-            f2 = meta_d["frame"]
+            f1 = meta_d["frame"]
+            f2 = meta_d["frame"] + self.polling_rate
+            if f2 >= len(u.trajectory):
+                f2 = len(u.trajectory) - 1
             t1 = u.trajectory[f1].time
             t2 = u.trajectory[f2].time
             old_bound = int(u.select_atoms(f"bonded index {idxs[0]}")[0].index)
@@ -195,6 +198,5 @@ class HAT_reaction(ReactionPlugin):
             recipes.append(Recipe(recipe_steps=seq, rates=[rate], timespans=[[t1, t2]]))
 
         recipe_collection = RecipeCollection(recipes)
-        # recipe_collection.aggregate_reactions() # useless with Place
 
         return recipe_collection

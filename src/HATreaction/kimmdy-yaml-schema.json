@@ -47,6 +47,13 @@
         "pytype": "str",
         "enum": ["place","lambda"],
         "default": "place"
+      },
+      "kmc": {
+        "description": "KMC algorithm for this reaction. Default: extrande",
+        "type": "string",
+        "pytype": "str",
+        "enum": ["rfkmc", "frm", "extrande"],
+        "default": "extrande"
       }
     },
     "required": ["frequency_factor"]
