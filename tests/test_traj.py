@@ -23,7 +23,10 @@ class DummyRunmanager:
     config.reactions.Hat_reaction.radicals = None
     config.reactions.Hat_reaction.change_coords = "place"
     config.reactions.Hat_reaction.kmc = "extrande"
-    radical_idxs = []
+
+    def __init__(self):
+        self.top = DummyClass()
+        self.top.radicals = {}
 
 
 @pytest.fixture

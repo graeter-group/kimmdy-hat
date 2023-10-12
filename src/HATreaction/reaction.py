@@ -72,7 +72,8 @@ class HAT_reaction(ReactionPlugin):
         if getattr(self.config, "radicals", None) is not None:
             rad_idxs = self.config.radicals
         else:
-            rad_idxs = getattr(self.runmng, "radical_idxs", [])
+            # One-based strings in top
+            rad_idxs = [str(int(i) - 1) for i in self.runmng.top.radicals.keys()]
         if len(rad_idxs) < 1:
             logger.debug("No radicals known, searching in structure..")
             rad_idxs = [str(a[0].index) for a in find_radicals(u)]
