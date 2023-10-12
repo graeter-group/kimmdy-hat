@@ -526,7 +526,7 @@ def _get_charge(atm):
     return charge
 
 
-def cap_single_rad(u, ts, rad, bonded_rad, h_cutoff=3, env_cutoff=7):
+def cap_single_rad(u, ts, rad, bonded_rad, h_cutoff=3, env_cutoff=15):
     """Builds capped systems around a single radical in a single frame.
     Aminoacids are capped at peptide bonds resulting in amines and amides.
     Subsystems contain the reactive hydrogen at index 0 followed by the
@@ -557,7 +557,7 @@ def cap_single_rad(u, ts, rad, bonded_rad, h_cutoff=3, env_cutoff=7):
         f"point { str(rad.positions).strip('[ ]') } {env_cutoff}"
     )
     # ts2 = mda.transformations.unwrap(env)(ts)
-    env.unwrap()
+    # env.unwrap()
 
     end_poss = find_radical_pos(rad[0], bonded_rad)
 
