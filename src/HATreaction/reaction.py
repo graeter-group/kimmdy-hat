@@ -18,6 +18,7 @@ class HAT_reaction(ReactionPlugin):
     def __init__(self, *args, **kwargs):
         logging.getLogger("tensorflow").setLevel("CRITICAL")
         import tensorflow as tf
+
         logging.getLogger("tensorflow").setLevel("CRITICAL")
         from tensorflow.keras.models import load_model
 
@@ -81,6 +82,7 @@ class HAT_reaction(ReactionPlugin):
         if len(rad_idxs) < 1:
             logger.info("--> retuning empty recipe collection")
             return RecipeCollection([])
+        rad_idxs = sorted(rad_idxs)
         sub_atms = u.select_atoms(
             f"((not resname SOL NA CL) and (around 20 index {' '.join([i for i in rad_idxs])}))"
             f" or index {' '.join([i for i in rad_idxs])}",
@@ -94,11 +96,15 @@ class HAT_reaction(ReactionPlugin):
             sub_start_t = ts.frame
             sub_end_t = ts.frame + self.polling_rate * 10
 
-            # subuni has different indices, translate: WARNING: id 1-based!!!
-            rad_idxs_sub = list(
-                map(
-                    str,
-                    u_sub.select_atoms(f"id {' '.join([i for i in rad_idxs])}").indices,
+            # subuni has different indices, translate: id 0-based!!!
+            rad_idxs_sub = sorted(
+                list(
+                    map(
+                        str,
+                        u_sub.select_atoms(
+                            f"id {' '.join([i for i in rad_idxs])}"
+                        ).indices,
+                    )
                 )
             )
 
