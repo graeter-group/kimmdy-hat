@@ -12,6 +12,9 @@ from kimmdy.recipe import Bind, Break, Place, Relax, Recipe, RecipeCollection
 from kimmdy.plugins import ReactionPlugin
 
 from pprint import pformat
+from tempfile import TemporaryDirectory
+import shutil
+from pathlib import Path
 
 
 class HAT_reaction(ReactionPlugin):
@@ -68,7 +71,10 @@ class HAT_reaction(ReactionPlugin):
         u = MDA.Universe(str(tpr), str(trr))
 
         se_dir = files.outputdir / "se"
-        # interp_dir = files.outputdir / "interp"
+        if not self.config.keep_structures:
+            se_dir_bck = se_dir
+            se_tmpdir = TemporaryDirectory()
+            se_dir = Path(se_tmpdir.name)
 
         if getattr(self.config, "radicals", None) is not None:
             rad_idxs = self.config.radicals
@@ -89,121 +95,137 @@ class HAT_reaction(ReactionPlugin):
             updating=True,
         )
 
-        # every 10 rate queries, update environment selection around radical
-        for ts in u.trajectory[:: self.polling_rate * 10]:
-            u_sub = MDA.Merge(sub_atms)
-            u_sub.load_new(str(trr), sub=sub_atms.indices)
-            sub_start_t = ts.frame
-            sub_end_t = ts.frame + self.polling_rate * 10
+        try:
+            # every 10 rate queries, update environment selection around radical
+            for ts in u.trajectory[:: self.polling_rate * 10]:
+                u_sub = MDA.Merge(sub_atms)
+                u_sub.load_new(str(trr), sub=sub_atms.indices)
+                sub_start_t = ts.frame
+                sub_end_t = ts.frame + self.polling_rate * 10
 
-            # subuni has different indices, translate: id 0-based!!!
-            rad_idxs_sub = sorted(
-                list(
-                    map(
-                        str,
-                        u_sub.select_atoms(
-                            f"id {' '.join([i for i in rad_idxs])}"
-                        ).indices,
+                # subuni has different indices, translate: id 0-based!!!
+                rad_idxs_sub = sorted(
+                    list(
+                        map(
+                            str,
+                            u_sub.select_atoms(
+                                f"id {' '.join([i for i in rad_idxs])}"
+                            ).indices,
+                        )
                     )
                 )
+
+                for r_s, r in zip(rad_idxs_sub, rad_idxs):
+                    assert list(u_sub.atoms[int(r_s)].bonded_atoms.names) == list(
+                        u.atoms[int(r)].bonded_atoms.names
+                    )
+
+                # check manually w/ ngl:
+                if 0:
+                    import nglview as ngl
+
+                    view = ngl.show_mdanalysis(u_sub, defaultRepresentation=False)
+                    view.representations = [
+                        {"type": "ball+stick", "params": {"sele": ""}},
+                        {
+                            "type": "spacefill",
+                            "params": {"sele": "", "radiusScale": 0.7},
+                        },
+                    ]
+                    view._set_selection("@" + ",".join(rad_idxs_sub), repr_index=1)
+                    view.center()
+                    view
+
+                subsystems = extract_subsystems(
+                    u_sub,
+                    rad_idxs_sub,
+                    h_cutoff=self.h_cutoff,
+                    start=sub_start_t,
+                    stop=sub_end_t,
+                    step=self.polling_rate,
+                    unique=False,
+                )
+                save_capped_systems(subsystems, se_dir)
+
+            in_ds, es, scale_t, meta_ds, metas_masked = create_meta_dataset_predictions(
+                meta_files=list(se_dir.glob("*.npz")),
+                batch_size=self.hparas["batchsize"],
+                mask_energy=False,
+                oneway=True,
             )
 
-            for r_s, r in zip(rad_idxs_sub, rad_idxs):
-                assert list(u_sub.atoms[int(r_s)].bonded_atoms.names) == list(
-                    u.atoms[int(r)].bonded_atoms.names
+            # Make predictions
+            ys = []
+            for model, m, s in zip(self.models, self.means, self.stds):
+                y = model.predict(in_ds).squeeze()
+                ys.append((y * s) + m)
+            ys = np.stack(ys)
+            ys = np.mean(np.array(ys), 0)
+
+            # Rate; RT=0.593
+            rates = list(np.multiply(self.freqfac, np.float_power(np.e, (-ys / 0.593))))
+            recipes = []
+            logger.debug(f"Barriers:\n{pformat(ys)}")
+            logger.info(f"Max Rate: {max(rates)}, predicted {len(rates)} rates")
+            logger.debug(f"Rates:\n{pformat(rates)}")
+            for meta_d, rate in zip(meta_ds, rates):
+                sub_idxs = meta_d["indices"][0:2]
+                idxs = [
+                    u_sub.select_atoms(f"index {sub_idx}").ids for sub_idx in sub_idxs
+                ]
+                assert all(
+                    [len(i) == 1 for i in idxs]
+                ), f"HAT atom index translation error! \n{meta_d}"
+                # idxs = [idx[0] + 1 for idx in idxs] # one-based
+                idxs = [int(idx[0]) for idx in idxs]  # zero-based
+
+                f1 = meta_d["frame"]
+                f2 = meta_d["frame"] + self.polling_rate
+                if f2 >= len(u.trajectory):
+                    f2 = len(u.trajectory) - 1
+                t1 = u.trajectory[f1].time
+                t2 = u.trajectory[f2].time
+                old_bound = int(u.select_atoms(f"bonded index {idxs[0]}")[0].index)
+
+                # get end position
+                pdb_e = meta_d["meta_path"].with_name(
+                    meta_d["meta_path"].stem + "_2.pdb"
+                )
+                with open(pdb_e) as f:
+                    finished = False
+                    while not finished:
+                        line = f.readline()
+                        if line[:11] == "ATOM      1":
+                            finished = True
+                            x = float(line[30:38].strip())
+                            y = float(line[38:46].strip())
+                            z = float(line[46:54].strip())
+
+                if self.config.change_coords == "place":
+                    seq = [
+                        Break(old_bound, idxs[0]),
+                        Place(ix_to_place=idxs[0], new_coords=[x, y, z]),
+                        Bind(idxs[0], idxs[1]),
+                    ]
+                elif self.config.change_coords == "lambda":
+                    seq = [Break(old_bound, idxs[0]), Bind(idxs[0], idxs[1]), Relax()]
+                else:
+                    raise ValueError(
+                        f"Unknown change_coords parameter {self.config.change_coords}"
+                    )
+
+                # make recipe
+                recipes.append(
+                    Recipe(recipe_steps=seq, rates=[rate], timespans=[[t1, t2]])
                 )
 
-            # check manually w/ ngl:
-            if 0:
-                import nglview as ngl
+            recipe_collection = RecipeCollection(recipes)
+        except Exception as e:
+            # backup in case of failure
+            if not self.config.keep_structures:
+                shutil.copytree(se_dir, se_dir_bck)
+            raise e
 
-                view = ngl.show_mdanalysis(u_sub, defaultRepresentation=False)
-                view.representations = [
-                    {"type": "ball+stick", "params": {"sele": ""}},
-                    {"type": "spacefill", "params": {"sele": "", "radiusScale": 0.7}},
-                ]
-                view._set_selection("@" + ",".join(rad_idxs_sub), repr_index=1)
-                view.center()
-                view
-
-            subsystems = extract_subsystems(
-                u_sub,
-                rad_idxs_sub,
-                h_cutoff=self.h_cutoff,
-                start=sub_start_t,
-                stop=sub_end_t,
-                step=self.polling_rate,
-                unique=False,
-            )
-            # maybe just keep in ram? optionally?
-            save_capped_systems(subsystems, se_dir)
-
-        in_ds, es, scale_t, meta_ds, metas_masked = create_meta_dataset_predictions(
-            meta_files=list(se_dir.glob("*.npz")),
-            batch_size=self.hparas["batchsize"],
-            mask_energy=False,
-            oneway=True,
-        )
-
-        # Make predictions
-        ys = []
-        for model, m, s in zip(self.models, self.means, self.stds):
-            y = model.predict(in_ds).squeeze()
-            ys.append((y * s) + m)
-        ys = np.stack(ys)
-        ys = np.mean(np.array(ys), 0)
-
-        # Rate; RT=0.593
-        rates = list(np.multiply(self.freqfac, np.float_power(np.e, (-ys / 0.593))))
-        recipes = []
-        logger.debug(f"Barriers:\n{pformat(ys)}")
-        logger.info(f"Max Rate: {max(rates)}, predicted {len(rates)} rates")
-        logger.debug(f"Rates:\n{pformat(rates)}")
-        for meta_d, rate in zip(meta_ds, rates):
-            sub_idxs = meta_d["indices"][0:2]
-            idxs = [u_sub.select_atoms(f"index {sub_idx}").ids for sub_idx in sub_idxs]
-            assert all(
-                [len(i) == 1 for i in idxs]
-            ), f"HAT atom index translation error! \n{meta_d}"
-            # idxs = [idx[0] + 1 for idx in idxs] # one-based
-            idxs = [int(idx[0]) for idx in idxs]  # zero-based
-
-            f1 = meta_d["frame"]
-            f2 = meta_d["frame"] + self.polling_rate
-            if f2 >= len(u.trajectory):
-                f2 = len(u.trajectory) - 1
-            t1 = u.trajectory[f1].time
-            t2 = u.trajectory[f2].time
-            old_bound = int(u.select_atoms(f"bonded index {idxs[0]}")[0].index)
-
-            # get end position
-            pdb_e = meta_d["meta_path"].with_name(meta_d["meta_path"].stem + "_2.pdb")
-            with open(pdb_e) as f:
-                finished = False
-                while not finished:
-                    line = f.readline()
-                    if line[:11] == "ATOM      1":
-                        finished = True
-                        x = float(line[30:38].strip())
-                        y = float(line[38:46].strip())
-                        z = float(line[46:54].strip())
-
-            if self.config.change_coords == "place":
-                seq = [
-                    Break(old_bound, idxs[0]),
-                    Place(ix_to_place=idxs[0], new_coords=[x, y, z]),
-                    Bind(idxs[0], idxs[1]),
-                ]
-            elif self.config.change_coords == "lambda":
-                seq = [Break(old_bound, idxs[0]), Bind(idxs[0], idxs[1]), Relax()]
-            else:
-                raise ValueError(
-                    f"Unknown change_coords parameter {self.config.change_coords}"
-                )
-
-            # make recipe
-            recipes.append(Recipe(recipe_steps=seq, rates=[rate], timespans=[[t1, t2]]))
-
-        recipe_collection = RecipeCollection(recipes)
-
+        if not self.config.keep_structures:
+            se_tmpdir.cleanup()
         return recipe_collection

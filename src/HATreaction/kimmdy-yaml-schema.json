@@ -54,6 +54,12 @@
         "pytype": "str",
         "enum": ["rfkmc", "frm", "extrande", "extrande_mod"],
         "default": "extrande_mod"
+      },
+      "keep_structures": {
+        "description": "For each reaction a structure is generated. If true, those are kept on disk, otherwise they are only kept in case of a failure. Default: False",
+        "type": "boolean",
+        "pytype": "bool",
+        "default": false
       }
     },
     "required": ["frequency_factor"]

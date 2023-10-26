@@ -23,6 +23,7 @@ class DummyRunmanager:
     config.reactions.Hat_reaction.radicals = None
     config.reactions.Hat_reaction.change_coords = "place"
     config.reactions.Hat_reaction.kmc = "extrande"
+    config.reactions.Hat_reaction.keep_structures = "extrande"
 
     def __init__(self):
         self.top = DummyClass()
