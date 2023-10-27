@@ -1,6 +1,6 @@
 from itertools import combinations
 import logging
-from pathlib import Path
+import MDAnalysis.coordinates.timestep
 from MDAnalysis.coordinates.XTC import XTCReader
 from MDAnalysis.analysis.distances import self_distance_array
 
@@ -12,6 +12,8 @@ from tqdm.autonotebook import tqdm
 
 from HATreaction.utils.utils import check_cylinderclash
 import logging
+from typing import Optional
+import numpy.typing as npt
 
 version = 0.5
 
@@ -526,6 +528,98 @@ def _get_charge(atm):
     return charge
 
 
+def extract_single_rad(
+    u: mda.Universe,
+    ts: MDAnalysis.coordinates.timestep,
+    rad: mda.AtomGroup,
+    bonded_rad: mda.AtomGroup,
+    h_cutoff: float = 3,
+    env_cutoff: float = 10,
+) -> npt.NDArray:
+    """Produces one cutout for each possible reaction around one given radical.
+
+    Parameters
+    ----------
+    u
+        Universe around the radical
+    ts
+        current timestep
+    rad
+        radical
+    bonded_rad
+        all atoms bound to the radical
+    h_cutoff
+        maximum distance a hydrogen can travel, by default 3
+    env_cutoff
+        size of cutout to make, by default 10
+
+    Returns
+    -------
+    np.ndarray[dict]
+        Array with one dict per reaction. Each dict hold start and end Universe,
+        as well as meta data
+    """
+    env = u.atoms.select_atoms(
+        f"point { str(rad.positions).strip('[ ]') } {env_cutoff}"
+    )
+    end_poss = find_radical_pos(rad[0], bonded_rad)
+    hs = []
+    for end_pos in end_poss:
+        hs.append(
+            env.select_atoms(
+                f"point { str(end_pos).strip('[ ]') } {h_cutoff} and element H"
+            )
+        )
+    hs = sum(hs) - bonded_rad  # exclude alpha-H
+
+    clashes = np.empty((len(hs), len(end_poss)), dtype=bool)
+    for h_idx, h in enumerate(hs):
+        for end_idx, end_pos in enumerate(end_poss):
+            clashes[h_idx, end_idx] = check_cylinderclash(
+                end_pos, h.position, env.positions, r_min=0.8
+            )
+
+    cut_systems = np.zeros((len(hs),), dtype=object)
+    min_translations = np.ones((len(hs),)) * 99
+
+    # iterate over defined HAT reactions
+    for h_idx, end_idx in zip(*np.nonzero(clashes)):
+        end_pos = end_poss[end_idx]
+        h = env.select_atoms(f"index {hs[h_idx].ix}")
+
+        translation = np.linalg.norm(end_pos - h.positions)
+        # only keep reaction w/ smallest translation
+        # there can be multiple end positions for one rad!
+        if translation > min_translations[h_idx]:
+            continue
+        min_translations[h_idx] = translation
+
+        other_atms = env - h - rad
+
+        cut_systems[h_idx] = {
+            "start_u": mda.core.universe.Merge(h, rad, other_atms),
+            "end_u": mda.core.universe.Merge(h, rad, other_atms),
+            "meta": {
+                "translation": translation,
+                "u1_name": rad[0].resname.lower() + "-sim",
+                "u2_name": h[0].resname.lower() + "-sim",
+                "trajectory": u._trajectory.filename,
+                "frame": ts.frame,
+                "indices": (*h.ix, *rad.ix, *other_atms.ix),
+                "intramol": rad[0].residue == h[0].residue,
+            },
+        }
+
+        # change H position in end universe
+        cut_systems[h_idx]["end_u"].atoms[0].position = end_pos
+
+        # hashes based on systems rather than subgroups, subgroubs would collide
+        cut_systems[h_idx]["meta"]["hash_u1"] = abs(hash(cut_systems[h_idx]["start_u"]))
+        cut_systems[h_idx]["meta"]["hash_u2"] = abs(hash(cut_systems[h_idx]["end_u"]))
+
+    return cut_systems[np.nonzero(cut_systems)[0]]
+
+
 def cap_single_rad(u, ts, rad, bonded_rad, h_cutoff=3, env_cutoff=15):
     """Builds capped systems around a single radical in a single frame.
     Aminoacids are capped at peptide bonds resulting in amines and amides.
@@ -568,7 +662,7 @@ def cap_single_rad(u, ts, rad, bonded_rad, h_cutoff=3, env_cutoff=15):
                 f"point { str(end_pos).strip('[ ]') } {h_cutoff} and element H"
             )
         )
-    hs = sum(hs) - bonded_rad  # reacting H be at radical already
+    hs = sum(hs) - bonded_rad  # exclude alpha-H
 
     # hs = (
     #     env.select_atoms(
@@ -624,19 +718,15 @@ def cap_single_rad(u, ts, rad, bonded_rad, h_cutoff=3, env_cutoff=15):
         if "H1" in core.names or "H2" in core.names:  # H1 H2 H3 form NH3+ end
             charge_correction += 1
 
+        # can't merge empty atom group
+        to_merge = [h, rad]
+        if len(caps) > 0:
+            to_merge.append(caps)
+        to_merge.append(core)
+
         capped_systems[h_idx] = {
-            "start_u": mda.core.universe.Merge(
-                h,
-                rad,
-                caps,
-                core,
-            ),
-            "end_u": mda.core.universe.Merge(
-                h,
-                rad,
-                caps,
-                core,
-            ),
+            "start_u": mda.core.universe.Merge(*to_merge),
+            "end_u": mda.core.universe.Merge(*to_merge),
             "meta": {
                 "translation": translation,
                 "u1_name": rad[0].resname.lower() + "-sim",
@@ -667,49 +757,54 @@ def cap_single_rad(u, ts, rad, bonded_rad, h_cutoff=3, env_cutoff=15):
 
 
 def extract_subsystems(
-    u,
-    rad_idxs,
-    h_cutoff=3,
-    env_cutoff=7,
-    start=None,
-    stop=None,
-    step=None,
+    u: mda.Universe,
+    rad_idxs: list[int],
+    h_cutoff: float = 3,
+    env_cutoff: float = 7,
+    start: Optional[int] = None,
+    stop: Optional[int] = None,
+    step: Optional[int] = None,
+    rad_min_dist: float = 3,
     unique=False,
-):
+    cap: bool = True,
+    logger: logging.Logger = logging.getLogger(__name__),
+) -> list:
     """Builds subsystems out of a trajectory for evaluation of HAT reaction
-    either by DFT or a ML model. Aminoacids are capped at peptide bonds
-    resulting in amines and amides. Subsystems contain the reactive hydrogen at
-    index 0 followed by the radical atom.
+    either by DFT or a ML model.
+    Aminoacids are optionally capped at peptide
+    bonds resulting in amines and amides.
+    Subsystems contain the reactive hydrogen at index 0 followed by the
+    radical atom.
     Note: This adaptes the residue names in given universe to the break
 
     Parameters
     ----------
-    u : mda.Universe
+    u
         Main universe
-    rad_idxs : List[int]
+    rad_idxs
         Indices of the two radical atoms
-    h_cutoff : int, optional
+    h_cutoff
         Cutoff radius for hydrogen search around radical, by default 3
-    env_cutoff : int, optional
+    env_cutoff
         Cutoff radius for local env used for better performance, by default 7
-    start : Union[int,None], optional
+    start
         For slicing the trajectory, by default None
-    stop : Union[int,None], optional
+    stop
         For slicing the trajectory, by default None
-    step : Union[int,None], optional
+    step
         For slicing the trajectory, by default None
-    unique : bool
+    unique
         If true, only keep one of every set of atoms.
 
     Returns
     -------
-    List
+    list
         List of capped subsystems
     """
 
-    assert len(rad_idxs) in [1, 2], "Error: One or two radicals must be given!"
+    assert len(rad_idxs) > 0, "Error: At least one radical must be given!"
 
-    rads = [u.select_atoms(f"index {rad}") for rad in rad_idxs]
+    rads: list[mda.AtomGroup] = [u.select_atoms(f"index {rad}") for rad in rad_idxs]
 
     # Delete bonds between radicals
     if len(rad_idxs) > 1:
@@ -722,7 +817,8 @@ def extract_subsystems(
 
     print("Calculating radical neighbors..")
     bonded_all = [u.select_atoms(f"bonded index {rad}") for rad in rad_idxs]
-    bonded_all = [b - sum(rads) for b in bonded_all]  # remove rads
+    # remove rads
+    bonded_all: list[mda.AtomGroup] = [b - sum(rads) for b in bonded_all]
 
     # correct residue of radicals to avoid residues w/ only 2 atoms
     # Necessary in case of backbone break other than peptide bond
@@ -741,39 +837,56 @@ def extract_subsystems(
                     rad[0].residue = goal_res[0]
                     bonded_rad.residues = goal_res[0]
 
-    capped_systems = {}
+    cut_systems = {}
 
     for ts in tqdm(u.trajectory[slice(start, stop, step)]):
-        if len(rads) > 1:
-            if np.linalg.norm(rads[0].positions[0] - rads[1].positions[0]) < 3:
-                print(f"Radical distance too small in frame {ts.frame}, skipping..")
+        for i, (rad, bonded_rad) in enumerate(zip(rads, bonded_all)):
+            # skip small distances
+            skip = False
+            for j, other_rad in enumerate(rads):
+                if i == j:
+                    continue
+                if (
+                    np.linalg.norm(rad.positions[0] - other_rad.positions[0])
+                    < rad_min_dist
+                ):
+                    logger.debug(
+                        f"Radical {rad} distance too small to {other_rad} in frame {ts.frame}, skipping.."
+                    )
+                    skip = True
+            if skip:
                 continue
 
-        for rad, bonded_rad in zip(rads, bonded_all):
-            capped_frame = cap_single_rad(u, ts, rad, bonded_rad, h_cutoff, env_cutoff)
+            if cap:
+                cut_frame = cap_single_rad(u, ts, rad, bonded_rad, h_cutoff, env_cutoff)
+            else:
+                cut_frame = extract_single_rad(
+                    u, ts, rad, bonded_rad, h_cutoff, env_cutoff
+                )
 
-            for i, capped in enumerate(capped_frame):
+            for i, cut_sys_dict in enumerate(cut_frame):
                 if unique:
-                    new_i_hash = hash(capped["meta"]["indices"])
+                    new_i_hash = hash(cut_sys_dict["meta"]["indices"])
                 else:
                     new_i_hash = str(i) + str(rad.indices) + str(ts.frame)
 
                 # skip existing systems w/ bigger translation
-                if new_i_hash in capped_systems.keys():
-                    if capped["meta"]["translation"] > capped_systems[new_i_hash][0]:
+                if new_i_hash in cut_systems.keys():
+                    if cut_sys_dict["meta"]["translation"] > cut_systems[new_i_hash][0]:
                         print("Skipping due to translation")
                         print(
-                            capped["meta"]["translation"], capped_systems[new_i_hash][0]
+                            cut_sys_dict["meta"]["translation"],
+                            cut_systems[new_i_hash][0],
                         )
                         continue
 
-                capped_systems[new_i_hash] = (
-                    capped["meta"]["translation"],
-                    capped,
+                cut_systems[new_i_hash] = (
+                    cut_sys_dict["meta"]["translation"],
+                    cut_sys_dict,
                 )
 
-    print(f"Created {len(capped_systems)} isolated systems.")
-    return list(capped_systems.values())
+    print(f"Created {len(cut_systems)} isolated systems.")
+    return list(cut_systems.values())
 
 
 def save_capped_systems(systems, out_dir):

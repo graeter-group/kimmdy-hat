@@ -140,10 +140,14 @@ class HAT_reaction(ReactionPlugin):
                     u_sub,
                     rad_idxs_sub,
                     h_cutoff=self.h_cutoff,
+                    env_cutoff=10,
                     start=sub_start_t,
                     stop=sub_end_t,
                     step=self.polling_rate,
+                    cap=False,
+                    rad_min_dist=3,
                     unique=False,
+                    logger=logger,
                 )
                 save_capped_systems(subsystems, se_dir)
 
