@@ -15,7 +15,7 @@ import logging
 from typing import Optional
 import numpy.typing as npt
 
-version = 0.5
+version = 0.6
 
 
 def find_radical_pos(
@@ -786,7 +786,7 @@ def extract_subsystems(
     h_cutoff
         Cutoff radius for hydrogen search around radical, by default 3
     env_cutoff
-        Cutoff radius for local env used for better performance, by default 7
+        Cutoff radius for local env, by default 7
     start
         For slicing the trajectory, by default None
     stop
@@ -795,7 +795,12 @@ def extract_subsystems(
         For slicing the trajectory, by default None
     unique
         If true, only keep one of every set of atoms.
-
+    cap
+        Whether or not the subsystems should be capped. If false, subsystems are
+        created by cutting out a sphere with radius env_cutoff. Optional, default: True
+    logger
+        logger instance, optional
+        
     Returns
     -------
     list
