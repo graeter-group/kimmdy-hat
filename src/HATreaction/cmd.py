@@ -39,7 +39,6 @@ def get_cmdline_args():
     parser.add_argument(
         "-p",
         "--plot",
-        action='store_true',
+        action="store_true",
         help="Create analysis plots for reaction results.",
     )
-
