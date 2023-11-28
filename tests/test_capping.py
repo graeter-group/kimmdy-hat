@@ -1,4 +1,4 @@
-#%%
+# %%
 from pathlib import Path
 from HATreaction.utils import trajectory_utils
 import pickle
@@ -6,10 +6,11 @@ import json
 import pytest
 import MDAnalysis as MDA
 
+
 def pickle_universe():
-    """Creates pickled MDAnalysis Universe for rapid loading. 
+    """Creates pickled MDAnalysis Universe for rapid loading.
     Pickles break between MDA version changes.
-    """    
+    """
     u = MDA.Universe(
         str(Path(__file__).parent / "test_capping_io" / "tri_helix.gro"),
         guess_bonds=True,
@@ -17,7 +18,7 @@ def pickle_universe():
         in_memory=True,
     )
     u.add_TopologyAttr("elements", u.atoms.types)
-    with open(Path(__file__).parent / "test_capping_io" / "universe.pckl", 'wb') as f:
+    with open(Path(__file__).parent / "test_capping_io" / "universe.pckl", "wb") as f:
         pickle.dump(u, f)
 
 
@@ -26,41 +27,44 @@ def pickle_universe():
 def universe():
     try:
         u_p = Path(__file__).parent / "test_capping_io" / "universe.pckl"
-        with open(u_p, 'rb') as f:
+        with open(u_p, "rb") as f:
             u = pickle.load(f)
         return u
-    
+
     except Exception:
         print("Could not load pickled universe, recreating..", end="")
         pickle_universe()
 
     print("Done\nLoading new pickle")
-    with open(u_p, 'rb') as f:
+    with open(u_p, "rb") as f:
         u = pickle.load(f)
     return u
 
+
 test_files = list((Path(__file__).parent / "test_capping_io").glob("*.json"))
 
-@pytest.fixture(params=test_files, ids=lambda p:p.name)
+
+@pytest.fixture(params=test_files, ids=lambda p: p.name)
 def cap_ref(request):
     with open(request.param) as f:
         ref = json.load(f)
     return ref
 
+
 def test_capping(cap_ref, universe):
-        inp_atm_idx = cap_ref["inp_atm_idx"]
-        true_cap_idxs = cap_ref["cap_idxs"]
-        true_cap_positions_flat = cap_ref["cap_positions_flat"]
+    inp_atm_idx = cap_ref["inp_atm_idx"]
+    true_cap_idxs = cap_ref["cap_idxs"]
+    true_cap_positions_flat = cap_ref["cap_positions_flat"]
 
-        cap, cap_idxs = trajectory_utils.cap_aa(universe.copy().atoms[inp_atm_idx])
+    cap, cap_idxs = trajectory_utils.cap_aa(universe.copy().atoms[inp_atm_idx])
 
-        assert true_cap_idxs == [int(p) for p in cap_idxs], "Cap ids wrong"
-        assert true_cap_positions_flat == pytest.approx(
-            [float(p) for p in cap.positions.reshape(-1)]
-        ), "Cap positions wrong"
+    assert true_cap_idxs == [int(p) for p in cap_idxs], "Cap ids wrong"
+    assert true_cap_positions_flat == pytest.approx(
+        [float(p) for p in cap.positions.reshape(-1)]
+    ), "Cap positions wrong"
 
 
-#%% ----- Create reference capping ------
+# %% ----- Create reference capping ------
 # import nglview as ngl
 # import random
 # import MDAnalysis as MDA

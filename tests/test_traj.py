@@ -45,6 +45,7 @@ def recipe_collection(tmpdir):
 
 
 def test_traj_to_recipes(recipe_collection):
+    print(recipe_collection.recipes)
     assert len(recipe_collection.recipes) == 15
     recipe_collection.aggregate_reactions()
     assert len(recipe_collection.recipes) == 15
