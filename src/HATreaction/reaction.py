@@ -96,12 +96,10 @@ class HAT_reaction(ReactionPlugin):
         )
 
         try:
-            # every 10 rate queries, update environment selection around radical
-            # for ts in u.trajectory[:: self.polling_rate ]:
-            for ts in u.trajectory[:: self.polling_rate * 10]:
+            # environment around radical is updated by ts incrementation
+            for ts in u.trajectory[:: self.polling_rate]:
                 sub_start_t = ts.frame
-                # sub_end_t = ts.frame + self.polling_rate
-                sub_end_t = ts.frame + self.polling_rate * 10
+                sub_end_t = ts.frame + self.polling_rate
 
                 # subuni has different indices, translate: id 0-based!!!
                 rad_idxs_sub = sorted(
