@@ -97,10 +97,10 @@ class HAT_reaction(ReactionPlugin):
 
         try:
             # every 10 rate queries, update environment selection around radical
+            # for ts in u.trajectory[:: self.polling_rate ]:
             for ts in u.trajectory[:: self.polling_rate * 10]:
-                u_sub = MDA.Merge(sub_atms)
-                u_sub.load_new(str(trr), sub=sub_atms.indices)
                 sub_start_t = ts.frame
+                # sub_end_t = ts.frame + self.polling_rate
                 sub_end_t = ts.frame + self.polling_rate * 10
 
                 # subuni has different indices, translate: id 0-based!!!
@@ -108,23 +108,18 @@ class HAT_reaction(ReactionPlugin):
                     list(
                         map(
                             str,
-                            u_sub.select_atoms(
+                            u.select_atoms(
                                 f"id {' '.join([i for i in rad_idxs])}"
                             ).indices,
                         )
                     )
                 )
 
-                for r_s, r in zip(rad_idxs_sub, rad_idxs):
-                    assert list(u_sub.atoms[int(r_s)].bonded_atoms.names) == list(
-                        u.atoms[int(r)].bonded_atoms.names
-                    )
-
                 # check manually w/ ngl:
                 if 0:
                     import nglview as ngl
 
-                    view = ngl.show_mdanalysis(u_sub, defaultRepresentation=False)
+                    view = ngl.show_mdanalysis(u, defaultRepresentation=False)
                     view.representations = [
                         {"type": "ball+stick", "params": {"sele": ""}},
                         {
@@ -137,7 +132,7 @@ class HAT_reaction(ReactionPlugin):
                     view
 
                 subsystems = extract_subsystems(
-                    u_sub,
+                    u,
                     rad_idxs_sub,
                     h_cutoff=self.h_cutoff,
                     env_cutoff=10,
@@ -174,9 +169,7 @@ class HAT_reaction(ReactionPlugin):
             logger.debug(f"Rates:\n{pformat(rates)}")
             for meta_d, rate in zip(meta_ds, rates):
                 sub_idxs = meta_d["indices"][0:2]
-                idxs = [
-                    u_sub.select_atoms(f"index {sub_idx}").ids for sub_idx in sub_idxs
-                ]
+                idxs = [u.select_atoms(f"index {sub_idx}").ids for sub_idx in sub_idxs]
                 assert all(
                     [len(i) == 1 for i in idxs]
                 ), f"HAT atom index translation error! \n{meta_d}"

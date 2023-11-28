@@ -800,7 +800,7 @@ def extract_subsystems(
         created by cutting out a sphere with radius env_cutoff. Optional, default: True
     logger
         logger instance, optional
-        
+
     Returns
     -------
     list
