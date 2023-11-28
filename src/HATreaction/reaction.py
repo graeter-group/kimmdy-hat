@@ -98,6 +98,9 @@ class HAT_reaction(ReactionPlugin):
         try:
             # environment around radical is updated by ts incrementation
             for ts in u.trajectory[:: self.polling_rate]:
+                u_sub = MDA.Merge(sub_atms)
+                w = u_sub.select_atoms('all')
+                w.write(f"step{ts.frame}.pdb")
                 sub_start_t = ts.frame
                 sub_end_t = ts.frame + self.polling_rate
 
@@ -106,7 +109,7 @@ class HAT_reaction(ReactionPlugin):
                     list(
                         map(
                             str,
-                            u.select_atoms(
+                            u_sub.select_atoms(
                                 f"id {' '.join([i for i in rad_idxs])}"
                             ).indices,
                         )
@@ -130,13 +133,13 @@ class HAT_reaction(ReactionPlugin):
                     view
 
                 subsystems = extract_subsystems(
-                    u,
+                    u_sub,
                     rad_idxs_sub,
                     h_cutoff=self.h_cutoff,
                     env_cutoff=10,
-                    start=sub_start_t,
-                    stop=sub_end_t,
-                    step=self.polling_rate,
+                    start=0,
+                    stop=1,
+                    step=1,
                     cap=False,
                     rad_min_dist=3,
                     unique=False,
@@ -166,6 +169,7 @@ class HAT_reaction(ReactionPlugin):
             logger.info(f"Max Rate: {max(rates)}, predicted {len(rates)} rates")
             logger.debug(f"Rates:\n{pformat(rates)}")
             for meta_d, rate in zip(meta_ds, rates):
+                print(meta_d)
                 sub_idxs = meta_d["indices"][0:2]
                 idxs = [u.select_atoms(f"index {sub_idx}").ids for sub_idx in sub_idxs]
                 assert all(
@@ -180,7 +184,7 @@ class HAT_reaction(ReactionPlugin):
                     f2 = len(u.trajectory) - 1
                 t1 = u.trajectory[f1].time
                 t2 = u.trajectory[f2].time
-                old_bound = int(u.select_atoms(f"bonded index {idxs[0]}")[0].index)
+                old_bound = int(u_sub.select_atoms(f"bonded index {idxs[0]}")[0].index)
 
                 # get end position
                 pdb_e = meta_d["meta_path"].with_name(
