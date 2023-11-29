@@ -64,7 +64,7 @@ class HAT_reaction(ReactionPlugin):
         from HATreaction.utils.input_generation import create_meta_dataset_predictions
 
         logger = files.logger
-        logger.debug("Getting recipe for reaction: homolysis")
+        logger.debug("Getting recipe for reaction: HAT")
 
         tpr = str(files.input["tpr"])
         trr = str(files.input["trr"])
