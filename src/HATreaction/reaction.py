@@ -15,6 +15,7 @@ from pprint import pformat
 from tempfile import TemporaryDirectory
 import shutil
 from pathlib import Path
+from tqdm.autonotebook import tqdm
 
 
 class HAT_reaction(ReactionPlugin):
@@ -97,8 +98,10 @@ class HAT_reaction(ReactionPlugin):
 
         try:
             # environment around radical is updated by ts incrementation
-            for ts in u.trajectory[:: self.polling_rate]:
+            logger.info(f"Searching trajectory for radical structures.")
+            for ts in tqdm(u.trajectory[:: self.polling_rate]):
                 u_sub = MDA.Merge(sub_atms)
+                u_sub.trajectory[0].dimensions = ts.dimensions
                 w = u_sub.select_atoms('all')
                 sub_start_t = ts.frame
                 sub_end_t = ts.frame + self.polling_rate
@@ -154,6 +157,7 @@ class HAT_reaction(ReactionPlugin):
             )
 
             # Make predictions
+            logger.info("Making predictions.")
             ys = []
             for model, m, s in zip(self.models, self.means, self.stds):
                 y = model.predict(in_ds).squeeze()
@@ -162,6 +166,7 @@ class HAT_reaction(ReactionPlugin):
             ys = np.mean(np.array(ys), 0)
 
             # Rate; RT=0.593
+            logger.info("Creating Recipes.")
             rates = list(np.multiply(self.freqfac, np.float_power(np.e, (-ys / 0.593))))
             recipes = []
             logger.debug(f"Barriers:\n{pformat(ys)}")

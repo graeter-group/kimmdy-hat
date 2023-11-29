@@ -8,7 +8,6 @@ import MDAnalysis as mda
 import numpy as np
 import random
 from scipy.spatial.transform import Rotation
-from tqdm.autonotebook import tqdm
 
 from HATreaction.utils.utils import check_cylinderclash
 import logging
@@ -596,6 +595,9 @@ def extract_single_rad(
 
         other_atms = env - h - rad
 
+        if any([len(i) == 0 for i in [h, rad, other_atms]]):
+            breakpoint()
+
         cut_systems[h_idx] = {
             "start_u": mda.core.universe.Merge(h, rad, other_atms),
             "end_u": mda.core.universe.Merge(h, rad, other_atms),
@@ -820,14 +822,12 @@ def extract_subsystems(
             except ValueError:
                 continue
 
-    print("Calculating radical neighbors..")
     bonded_all = [u.select_atoms(f"bonded index {rad}") for rad in rad_idxs]
     # remove rads
     bonded_all: list[mda.AtomGroup] = [b - sum(rads) for b in bonded_all]
 
     # correct residue of radicals to avoid residues w/ only 2 atoms
     # Necessary in case of backbone break other than peptide bond
-    print("Correcting residue of radical group..")
     for rad, bonded_rad in zip(rads, bonded_all):
         if len(bonded_rad.residues) == 1:
             continue
@@ -844,7 +844,7 @@ def extract_subsystems(
 
     cut_systems = {}
 
-    for ts in tqdm(u.trajectory[slice(start, stop, step)]):
+    for ts in u.trajectory[slice(start, stop, step)]:
         for i, (rad, bonded_rad) in enumerate(zip(rads, bonded_all)):
             # skip small distances
             skip = False
@@ -878,8 +878,8 @@ def extract_subsystems(
                 # skip existing systems w/ bigger translation
                 if new_i_hash in cut_systems.keys():
                     if cut_sys_dict["meta"]["translation"] > cut_systems[new_i_hash][0]:
-                        print("Skipping due to translation")
-                        print(
+                        logger.debug("Skipping due to translation")
+                        logger.debug(
                             cut_sys_dict["meta"]["translation"],
                             cut_systems[new_i_hash][0],
                         )
@@ -890,7 +890,7 @@ def extract_subsystems(
                     cut_sys_dict,
                 )
 
-    print(f"Created {len(cut_systems)} isolated systems.")
+    logger.debug(f"Created {len(cut_systems)} isolated systems.")
     return list(cut_systems.values())
 
 
@@ -907,12 +907,12 @@ def save_capped_systems(systems, out_dir):
     if not out_dir.exists():
         out_dir.mkdir(parents=True)
 
-    for system in tqdm(systems):
+    for system in systems:
         system = system[1]  # 0 is translation
         sys_hash = f'{system["meta"]["hash_u1"]}_{system["meta"]["hash_u2"]}'
 
         if (out_dir / f"{sys_hash}.npz").exists():
-            print(f"ERROR: {sys_hash} hash exists!")
+            #print(f"ERROR: {sys_hash} hash exists!")
             continue
 
         system["start_u"].atoms.write(out_dir / f"{sys_hash}_1.pdb")
@@ -936,6 +936,7 @@ def make_radicals(
     h_cutoff=3,
     out_dir=None,
     h_index=None,
+    logger: logging.Logger = logging.getLogger(__name__),
 ):
     """Takes non radical trajectory and makes radical
     trajectories from it.
@@ -966,6 +967,8 @@ def make_radicals(
         If give, capped systems are saved after each generated radical
     h_index : int
         For debugging, index of H to select, instead of chosing a random one. By default None
+    logger:
+        logger instance, optional
     """
 
     all_heavy = u.select_atoms("not element H")
@@ -980,7 +983,7 @@ def make_radicals(
     if h_index is not None:
         sel_Hs = [u.select_atoms(f"index {h_index}")[0]]
     for sel_H in sel_Hs:
-        print(f"Selected H to remove: {sel_H}")
+        logger.debug(f"Selected H to remove: {sel_H}")
         rad = sel_H.bonded_atoms
 
         # remove one H and reorder atoms
@@ -1000,7 +1003,7 @@ def make_radicals(
                 h_cutoff=h_cutoff,
             )
         except Exception as e:
-            print(f"Selected H: {sel_H}")
+            logger.debug(f"Selected H: {sel_H}")
             raise e
 
         for sub in subs:
@@ -1009,7 +1012,7 @@ def make_radicals(
 
         if out_dir is not None:
             save_capped_systems(subs, out_dir)
-            print(f"Saved {len(subs)} systems in {out_dir}")
+            logger.debug(f"Saved {len(subs)} systems in {out_dir}")
 
     return capped_systems
 
@@ -1031,6 +1034,7 @@ def make_radicals_smart(
     unique=True,
     h_cutoff=1.7,
     out_dir=None,
+    logger: logging.Logger = logging.getLogger(__name__),
 ):
     """Takes non radical trajectory and makes radical
     trajectories from it.
@@ -1064,12 +1068,14 @@ def make_radicals_smart(
         Cutoff radius for hydrogen translation, used to preselect Hs, by default 1.7
     out_dir : Path
         If give, capped systems are saved after each generated radical
+    logger:
+        logger instance, optional
     """
     all_heavy = u.select_atoms("not element H")
     all_Hs = u.select_atoms("element H")
 
     sub_Hs = []
-    for ts in tqdm(u.trajectory[start:stop:search_step], "Searching close H"):
+    for ts in u.trajectory[start:stop:search_step]:
         # define smaller sub-search spaces
         for _ in range(20):
             center_idx = all_Hs[random.sample(range(len(all_Hs)), 1)][0].index
@@ -1084,9 +1090,9 @@ def make_radicals_smart(
                         sub_Hs.append((local_Hs[j], d[k], ts.frame))
                     k += 1
     sub_Hs = np.array(sub_Hs)
-    print("Found small distances:", sub_Hs.shape)
+    logger.debug("Found small distances:", sub_Hs.shape)
     sub_Hs = sub_Hs[(np.unique(sub_Hs[:, 0], return_index=True))[1]]
-    print("Found unique systems:", sub_Hs.shape)
+    logger.debug("Found unique systems:", sub_Hs.shape)
 
     # sample uniformly across found distances
     rng = np.random.default_rng()
@@ -1102,13 +1108,13 @@ def make_radicals_smart(
         mask.pop(masked_idx)
 
     sel_Hs = sub_Hs[idxs][:, [0, 2]]
-    print(
+    logger.debug(
         f"Selected {len(idxs)} Hs at distances from {sub_Hs[:, 1].min():.02f} to {sub_Hs[:, 1].max():.02f}"
     )
     # Building of universes
     capped_systems = []
     for sel_H, frame in sel_Hs:
-        print(f"Selected H to remove: {sel_H}")
+        logger.debug(f"Selected H to remove: {sel_H}")
         rad = sel_H.bonded_atoms
 
         # remove one H and reorder atoms
@@ -1128,7 +1134,7 @@ def make_radicals_smart(
                 h_cutoff=h_cutoff,
             )
         except Exception as e:
-            print(f"Selected H: {sel_H}")
+            logger.debug(f"Selected H: {sel_H}")
             raise e
         for sub in subs:
             sub[1]["meta"]["traj_H"] = sel_H.index
@@ -1136,6 +1142,6 @@ def make_radicals_smart(
 
         if out_dir is not None:
             save_capped_systems(subs, out_dir)
-            print(f"Saved {len(subs)} systems in {out_dir}")
+            logger.debug(f"Saved {len(subs)} systems in {out_dir}")
 
     return capped_systems
