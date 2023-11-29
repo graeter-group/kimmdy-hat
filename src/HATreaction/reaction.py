@@ -100,7 +100,6 @@ class HAT_reaction(ReactionPlugin):
             for ts in u.trajectory[:: self.polling_rate]:
                 u_sub = MDA.Merge(sub_atms)
                 w = u_sub.select_atoms('all')
-                w.write(f"step{ts.frame}.pdb")
                 sub_start_t = ts.frame
                 sub_end_t = ts.frame + self.polling_rate
 
@@ -169,7 +168,6 @@ class HAT_reaction(ReactionPlugin):
             logger.info(f"Max Rate: {max(rates)}, predicted {len(rates)} rates")
             logger.debug(f"Rates:\n{pformat(rates)}")
             for meta_d, rate in zip(meta_ds, rates):
-                print(meta_d)
                 sub_idxs = meta_d["indices"][0:2]
                 idxs = [u.select_atoms(f"index {sub_idx}").ids for sub_idx in sub_idxs]
                 assert all(
