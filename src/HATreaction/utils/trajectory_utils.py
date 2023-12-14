@@ -909,7 +909,7 @@ def save_capped_systems(systems, out_dir):
         sys_hash = f'{system["meta"]["hash_u1"]}_{system["meta"]["hash_u2"]}'
 
         if (out_dir / f"{sys_hash}.npz").exists():
-            #print(f"ERROR: {sys_hash} hash exists!")
+            # print(f"ERROR: {sys_hash} hash exists!")
             continue
 
         system["start_u"].atoms.write(out_dir / f"{sys_hash}_1.pdb")
