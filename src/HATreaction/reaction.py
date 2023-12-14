@@ -106,7 +106,7 @@ class HAT_reaction(ReactionPlugin):
                 if 0:
                     import nglview as ngl
 
-                    view = ngl.show_mdanalysis(u, defaultRepresentation=False)
+                    view = ngl.show_mdanalysis(u_sub, defaultRepresentation=False)
                     view.representations = [
                         {"type": "ball+stick", "params": {"sele": ""}},
                         {
