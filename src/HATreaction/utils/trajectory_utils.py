@@ -584,7 +584,7 @@ def extract_single_rad(
     # iterate over defined HAT reactions
     for h_idx, end_idx in zip(*np.nonzero(clashes)):
         end_pos = end_poss[end_idx]
-        h = env.select_atoms(f"index {hs[h_idx].ix}")
+        h = env.select_atoms(f"id {hs[h_idx].id}")
 
         translation = np.linalg.norm(end_pos - h.positions)
         # only keep reaction w/ smallest translation
@@ -595,9 +595,6 @@ def extract_single_rad(
 
         other_atms = env - h - rad
 
-        if any([len(i) == 0 for i in [h, rad, other_atms]]):
-            breakpoint()
-
         cut_systems[h_idx] = {
             "start_u": mda.core.universe.Merge(h, rad, other_atms),
             "end_u": mda.core.universe.Merge(h, rad, other_atms),
@@ -607,7 +604,7 @@ def extract_single_rad(
                 "u2_name": h[0].resname.lower() + "-sim",
                 "trajectory": u._trajectory.filename,
                 "frame": ts.frame,
-                "indices": (*h.ix, *rad.ix, *other_atms.ix),
+                "indices": (*h.ids, *rad.ids, *other_atms.ids),
                 "intramol": rad[0].residue == h[0].residue,
             },
         }
@@ -760,7 +757,7 @@ def cap_single_rad(u, ts, rad, bonded_rad, h_cutoff=3, env_cutoff=15):
 
 def extract_subsystems(
     u: mda.Universe,
-    rad_idxs: list[int],
+    rad_ids: list[str],
     h_cutoff: float = 3,
     env_cutoff: float = 7,
     start: Optional[int] = None,
@@ -809,20 +806,20 @@ def extract_subsystems(
         List of capped subsystems
     """
 
-    assert len(rad_idxs) > 0, "Error: At least one radical must be given!"
+    assert len(rad_ids) > 0, "Error: At least one radical must be given!"
 
-    rads: list[mda.AtomGroup] = [u.select_atoms(f"index {rad}") for rad in rad_idxs]
+    rads: list[mda.AtomGroup] = [u.select_atoms(f"id {rad}") for rad in rad_ids]
 
     # Delete bonds between radicals
-    if len(rad_idxs) > 1:
-        combs = combinations(rad_idxs, 2)
+    if len(rad_ids) > 1:
+        combs = combinations(rad_ids, 2)
         for c in combs:
             try:
                 u.delete_bonds([c])
             except ValueError:
                 continue
 
-    bonded_all = [u.select_atoms(f"bonded index {rad}") for rad in rad_idxs]
+    bonded_all = [u.select_atoms(f"bonded id {rad}") for rad in rad_ids]
     # remove rads
     bonded_all: list[mda.AtomGroup] = [b - sum(rads) for b in bonded_all]
 
