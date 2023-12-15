@@ -158,9 +158,6 @@ class HAT_reaction(ReactionPlugin):
             logger.debug(f"Rates:\n{pformat(rates)}")
             for meta_d, rate in zip(meta_ds, rates):
                 ids = [int(i) for i in meta_d["indices"][0:2]]  # should be zero-based
-                # assert all(           # what is this for? shouldn't meta_d["indices"][0:2] be a list of ints?
-                #     [len(i) == 1 for i in ids]
-                # ), f"HAT atom index translation error! \n{meta_d}"
 
                 f1 = meta_d["frame"]
                 f2 = meta_d["frame"] + self.polling_rate
