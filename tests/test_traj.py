@@ -63,3 +63,38 @@ def test_traj_to_recipes(recipe_collection):
     for recipe in recipe_collection.recipes:
         assert len(recipe.rates) == 3
         assert len(recipe.timespans) == 3
+
+
+@pytest.fixture
+def recipe_collection_pbc(tmpdir):
+    plgn = HAT_reaction("Hat_reaction", DummyRunmanager())
+
+    files = DummyClass()
+    files.input = {
+        "tpr": Path(__file__).parent / "test_traj_io" / "dopa_pbc.tpr",
+        "trr": Path(__file__).parent / "test_traj_io" / "dopa_pbc.trr",
+    }
+    files.outputdir = Path(tmpdir)
+
+    return plgn.get_recipe_collection(files)
+
+
+def test_traj_to_recipes_pbc(recipe_collection_pbc):
+    print(recipe_collection_pbc.recipes)
+    assert len(recipe_collection_pbc.recipes) == 4
+    recipe_collection_pbc.aggregate_reactions()
+    assert len(recipe_collection_pbc.recipes) == 4
+
+    for recipe in recipe_collection_pbc.recipes:
+        assert len(recipe.rates) == 1
+        assert len(recipe.timespans) == 1
+
+    # remove 'place'
+    [r.recipe_steps.pop(1) for r in recipe_collection_pbc.recipes]
+    recipe_collection_pbc.aggregate_reactions()
+
+    assert len(recipe_collection_pbc.recipes) == 2
+
+    for recipe in recipe_collection_pbc.recipes:
+        assert len(recipe.rates) == 2
+        assert len(recipe.timespans) == 2
