@@ -166,7 +166,7 @@ class HAT_reaction(ReactionPlugin):
             ys = np.stack(ys)
             ys = np.mean(np.array(ys), 0)
 
-            # Rate; RT=0.593
+            # Rate; RT=0.593 kcal/mol
             rates = list(np.multiply(self.freqfac, np.float_power(np.e, (-ys / 0.593))))
             recipes = []
             logger.debug(f"Barriers:\n{pformat(ys)}")

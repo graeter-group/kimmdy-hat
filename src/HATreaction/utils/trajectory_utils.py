@@ -11,7 +11,6 @@ from scipy.spatial.transform import Rotation
 from tqdm.autonotebook import tqdm
 
 from HATreaction.utils.utils import check_cylinderclash
-import logging
 from typing import Optional
 import numpy.typing as npt
 
@@ -30,8 +29,6 @@ def find_radical_pos(
         Radical atom
     bonded : mda.core.groups.AtomGroup
         Atom group of bonded atoms. From its length the geometry is predicted.
-    tetrahedral : bool
-        Whether to assume a tetrahedral conformation around C and N
 
     Returns
     -------
@@ -800,7 +797,7 @@ def extract_subsystems(
         created by cutting out a sphere with radius env_cutoff. Optional, default: True
     logger
         logger instance, optional
-        
+
     Returns
     -------
     list
