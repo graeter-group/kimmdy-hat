@@ -14,7 +14,7 @@ from HATreaction.utils.utils import check_cylinderclash
 from typing import Optional
 import numpy.typing as npt
 
-version = 0.6
+version = 0.7
 
 
 def find_radical_pos(
@@ -82,11 +82,13 @@ def find_radical_pos(
     # Radicals w/ only one bond:
     elif len(bonded) == 1:
         # suggest positions in a 109.5 degree cone
-        assert center.element in ["O", "S"], "Element type does not match bond number"
+        assert center.element in ["N","O", "S"], "Element type does not match bond number"
         if center.element == "O":
             scale = scale_O
         elif center.element == "S":
             scale = scale_S
+        elif center.element == "N":
+            scale = scale_N
 
         b = bonded[0]
         b_vec = b.position - center.position
