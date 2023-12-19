@@ -8,7 +8,6 @@ import MDAnalysis as mda
 import numpy as np
 import random
 from scipy.spatial.transform import Rotation
-from tqdm.autonotebook import tqdm
 
 from HATreaction.utils.utils import check_cylinderclash
 from typing import Optional
@@ -131,15 +130,15 @@ def get_residue(atm):
     """
     resid = atm.resid
     atm_env = atm.universe.select_atoms(f"point { str(atm.position).strip('[ ]') } 15")
-    to_check = atm_env.select_atoms(f"bonded index {atm.ix}")
-    checked = atm_env.select_atoms(f"index {atm.ix}")
-    resid_group = atm_env.select_atoms(f"index {atm.ix}")
+    to_check = atm_env.select_atoms(f"bonded id {atm.id}")
+    checked = atm_env.select_atoms(f"id {atm.id}")
+    resid_group = atm_env.select_atoms(f"id {atm.id}")
 
     while len(to_check) > 0:
         for c_atm in to_check:
             if c_atm.resid == resid:
                 resid_group = resid_group + c_atm
-                to_check = to_check + atm_env.select_atoms(f"bonded index {c_atm.ix}")
+                to_check = to_check + atm_env.select_atoms(f"bonded id {c_atm.id}")
             checked = checked + c_atm
             to_check = to_check - checked
     assert (
@@ -213,21 +212,21 @@ def cap_aa(atms):
         f"point { str(possible_ends[0].position).strip('[ ]') } 20"
     )
     cap_atms = []
-    cap_ix = []
+    cap_id = []
 
     for pe in possible_ends:
         if pe.element == "C":
             # build cap from atoms of next AA
             cap_d = {
                 "N": env.select_atoms(
-                    f"(bonded index {pe.ix}) and not resid {pe.resid} and element N"
+                    f"(bonded id {pe.id}) and not resid {pe.resid} and element N"
                 )
             }
 
             # check cap selection
             assert (
                 len(cap_d["N"]) <= 1
-            ), f"ERROR: Wrong cap atom selection at index {pe.ix}, cap: {list(cap_d['N'])}"
+            ), f"ERROR: Wrong cap atom selection at id {pe.id}, cap: {list(cap_d['N'])}"
             if pe.name not in [i for l in special_ends.values() for i in l]:
                 if len(cap_d["N"]) == 0:
                     continue  # chain end reached (on radical?)
@@ -237,7 +236,7 @@ def cap_aa(atms):
                     cap = cap_d["N"][0].residue.atoms
                     u_cap = mda.core.universe.Merge(cap)
                     cap_atms.append(u_cap.atoms)
-                    [cap_ix.append(i) for i in cap.ix]
+                    [cap_id.append(i) for i in cap.ids]
                     continue
             if cap_d["N"].residues in atms.residues:
                 continue  # next aminoacid included, no need to cap
@@ -245,7 +244,7 @@ def cap_aa(atms):
             # Special cases:
             if pe.name in special_ends["LYX"]:
                 cap_d["C"] = env.select_atoms(
-                    f"(bonded index {pe.ix}) and not resid {pe.resid}"
+                    f"(bonded id {pe.id}) and not resid {pe.resid}"
                 )
                 cap_d["C_H3"] = cap_d["C"][0].bonded_atoms - pe
                 cap = sum([cap_d[k] for k in ["C", "C_H3"]])
@@ -256,26 +255,26 @@ def cap_aa(atms):
 
             elif pe.name in special_ends["LY2"] + special_ends["LY3"]:
                 cap_d["C"] = env.select_atoms(
-                    f"(bonded index {pe.ix}) and not resid {pe.resid}"
+                    f"(bonded id {pe.id}) and not resid {pe.resid}"
                 )
                 cap_d["CC2"] = cap_d["C"][0].bonded_atoms - pe
-                cc2_ix = " ".join([str(i) for i in cap_d["CC2"].ix])
+                cc2_id = " ".join([str(i) for i in cap_d["CC2"].ids])
                 cc2_res = " ".join([str(i) for i in cap_d["CC2"].resids])
                 cap_d["CCC"] = env.select_atoms(
-                    f"(bonded index {cc2_ix}) and not resid {cc2_res}"
+                    f"(bonded id {cc2_id}) and not resid {cc2_res}"
                 )
                 cap_d["CCCH3"] = env.select_atoms(
-                    f"(bonded index {cap_d['CCC'][0].ix}) and resid {cap_d['CCC'][0].resid}"
+                    f"(bonded id {cap_d['CCC'][0].id}) and resid {cap_d['CCC'][0].resid}"
                 )
 
                 exclude_s = " ".join(["N", "C", "CA", "CB", "CG", "CD", "OD"])
                 cap_d["ring"] = cap_d["C"][0].residue.atoms.select_atoms(
                     f"not name {exclude_s} and not bonded name {exclude_s}"
                 )
-                ring_ix = " ".join([str(i) for i in cap_d["ring"].ix])
+                ring_id = " ".join([str(i) for i in cap_d["ring"].ids])
                 cap_d["ringC"] = (
                     env.select_atoms(
-                        f'resid {cap_d["C"][0].resid} and bonded index {ring_ix}'
+                        f'resid {cap_d["C"][0].resid} and bonded id {ring_id}'
                     )
                     - cap_d["ring"]
                 )
@@ -312,7 +311,7 @@ def cap_aa(atms):
                             logging.debug("Broken backbone in capping AA detected!")
 
                 N_alphas = env.select_atoms(
-                    f"((bonded index {cap_d['N'][0].ix}) and (resid {cap_d['N'][0].resid})) or ((bonded index {cap_d['N'][0].ix}) and name H)"
+                    f"((bonded id {cap_d['N'][0].id}) and (resid {cap_d['N'][0].resid})) or ((bonded id {cap_d['N'][0].id}) and name H)"
                 )
 
                 # broken bond after N:
@@ -324,7 +323,7 @@ def cap_aa(atms):
                     cap = cap_d["N"] + N_alphas
                     u_cap = mda.core.universe.Merge(cap)
                     cap_atms.append(u_cap.atoms)
-                    [cap_ix.append(i) for i in cap.ix]
+                    [cap_id.append(i) for i in cap.ids]
                     continue
 
                 # C_a --> CH3,
@@ -375,20 +374,20 @@ def cap_aa(atms):
 
             _scale_and_mutate(u_cap, h_idxs)
             cap_atms.append(u_cap.atoms)
-            [cap_ix.append(i) for i in cap.ix]
+            [cap_id.append(i) for i in cap.ids]
 
         if pe.element == "N":
             # build cap from atoms of next AA
             cap_d = {
                 "C": env.select_atoms(
-                    f"((bonded index {pe.ix}) and not resid {pe.resid}) and not name H"
+                    f"((bonded id {pe.id}) and not resid {pe.resid}) and not name H"
                 )
             }
 
             # check cap selection
             assert (
                 len(cap_d["C"]) <= 1
-            ), f"ERROR: Wrong cap atom selection at index {pe.ix}, cap: {list(cap_d['C'])}"
+            ), f"ERROR: Wrong cap atom selection at id {pe.id}, cap: {list(cap_d['C'])}"
             if len(cap_d["C"]) == 0:
                 continue  # chain end reached
             if cap_d["C"].residues in atms.residues:
@@ -397,7 +396,7 @@ def cap_aa(atms):
                 cap = cap_d["C"][0].residue.atoms
                 u_cap = mda.core.universe.Merge(cap)
                 cap_atms.append(u_cap.atoms)
-                [cap_ix.append(i) for i in cap.ix]
+                [cap_id.append(i) for i in cap.ids]
                 continue
 
             # skip if linker AA, always build from C term
@@ -411,7 +410,7 @@ def cap_aa(atms):
                         continue
 
             C_alphas = env.select_atoms(
-                f"(bonded index {cap_d['C'][0].ix}) and (resid {cap_d['C'][0].resid})"
+                f"(bonded id {cap_d['C'][0].id}) and (resid {cap_d['C'][0].resid})"
             )
 
             # Cap within HLKNL crosslink
@@ -419,7 +418,7 @@ def cap_aa(atms):
                 cap_d["C_H2"] = C_alphas[np.nonzero(C_alphas.elements == "H")]
                 cap_d["CC"] = C_alphas[np.nonzero(C_alphas.elements == "C")]
                 C_betas = env.select_atoms(
-                    f"(bonded index {cap_d['CC'][0].ix}) and not (index {cap_d['C'][0].ix})"
+                    f"(bonded id {cap_d['CC'][0].id}) and not (id {cap_d['C'][0].id})"
                 )
                 cap_d["CC_H2"] = C_betas[np.nonzero(C_betas.elements != "O")]  # H & CG
                 cap_d["CCO"] = C_betas[np.nonzero(C_betas.elements == "O")]
@@ -454,7 +453,7 @@ def cap_aa(atms):
                     cap = cap_d["C"] + C_alphas
                     u_cap = mda.core.universe.Merge(cap)
                     cap_atms.append(u_cap.atoms)
-                    [cap_ix.append(i) for i in cap.ix]
+                    [cap_id.append(i) for i in cap.ids]
                     continue
 
                 cap_d["O"] = filter(lambda a: a.element == "O", C_alphas).__next__()
@@ -476,14 +475,14 @@ def cap_aa(atms):
 
             _scale_and_mutate(u_cap, h_idxs)
             cap_atms.append(u_cap.atoms)
-            [cap_ix.append(i) for i in cap.ix]
+            [cap_id.append(i) for i in cap.ids]
 
     if len(cap_atms) == 0:
         cap = mda.Universe.empty(0).atoms
     else:
         cap = mda.core.universe.Merge(*cap_atms).atoms
 
-    return cap, cap_ix
+    return cap, cap_id
 
 
 def _get_charge(atm):
@@ -584,7 +583,7 @@ def extract_single_rad(
     # iterate over defined HAT reactions
     for h_idx, end_idx in zip(*np.nonzero(clashes)):
         end_pos = end_poss[end_idx]
-        h = env.select_atoms(f"index {hs[h_idx].ix}")
+        h = env.select_atoms(f"id {hs[h_idx].id}")
 
         translation = np.linalg.norm(end_pos - h.positions)
         # only keep reaction w/ smallest translation
@@ -604,7 +603,7 @@ def extract_single_rad(
                 "u2_name": h[0].resname.lower() + "-sim",
                 "trajectory": u._trajectory.filename,
                 "frame": ts.frame,
-                "indices": (*h.ix, *rad.ix, *other_atms.ix),
+                "indices": (*h.ids, *rad.ids, *other_atms.ids),
                 "intramol": rad[0].residue == h[0].residue,
             },
         }
@@ -678,8 +677,8 @@ def cap_single_rad(u, ts, rad, bonded_rad, h_cutoff=3, env_cutoff=15):
             )
 
     # get whole residues near radical
-    rad_alphas = env.select_atoms(f"bonded index {rad[0].ix}")
-    # rad_betas = sum([env.select_atoms(f'bonded index {alpha.ix}') for alpha in rad_alphas]) - rad
+    rad_alphas = env.select_atoms(f"bonded id {rad[0].id}")
+    # rad_betas = sum([env.select_atoms(f'bonded id {alpha.id}') for alpha in rad_alphas]) - rad
 
     rad_aa = get_res_union(rad_alphas)
 
@@ -689,7 +688,7 @@ def cap_single_rad(u, ts, rad, bonded_rad, h_cutoff=3, env_cutoff=15):
     # iterate over defined HAT reactions
     for h_idx, end_idx in zip(*np.nonzero(clashes)):
         end_pos = end_poss[end_idx]
-        h = env.select_atoms(f"index {hs[h_idx].ix}")
+        h = env.select_atoms(f"id {hs[h_idx].id}")
 
         translation = np.linalg.norm(end_pos - h.positions)
         # only keep reaction w/ smallest translation
@@ -698,14 +697,14 @@ def cap_single_rad(u, ts, rad, bonded_rad, h_cutoff=3, env_cutoff=15):
         min_translations[h_idx] = translation
 
         # get whole residues near reacting H
-        h_alpha = env.select_atoms(f"bonded index {h[0].ix}")[0]
-        h_betas = sum(env.select_atoms(f"bonded index {h_alpha.ix}")) - h
+        h_alpha = env.select_atoms(f"bonded id {h[0].id}")[0]
+        h_betas = sum(env.select_atoms(f"bonded id {h_alpha.id}")) - h
         # h_gammas = sum(env.select_atoms(f'bonded index {" ".join([str(i) for i in h_betas.ix])}')) - h_alpha
 
         h_aa = get_res_union(h_betas)
 
         core = h_aa | rad_aa
-        caps, caps_ix = cap_aa(core)
+        caps, caps_id = cap_aa(core)
 
         # core can have more residues than just h-res and rad-res, important for charge!
         core = core - h - rad
@@ -734,7 +733,7 @@ def cap_single_rad(u, ts, rad, bonded_rad, h_cutoff=3, env_cutoff=15):
                 "charge_u2": _get_charge(h[0]),
                 "trajectory": u._trajectory.filename,
                 "frame": ts.frame,
-                "indices": (*h.ix, *rad.ix, *caps_ix, *h_aa.ix, *rad_aa.ix),
+                "indices": (*h.id, *rad.id, *caps_id, *h_aa.id, *rad_aa.id),
                 "intramol": rad[0].residue == h[0].residue,
                 "charge": sum([_get_charge(res.atoms[0]) for res in core.residues])
                 + charge_correction,
@@ -757,7 +756,7 @@ def cap_single_rad(u, ts, rad, bonded_rad, h_cutoff=3, env_cutoff=15):
 
 def extract_subsystems(
     u: mda.Universe,
-    rad_idxs: list[int],
+    rad_ids: list[str],
     h_cutoff: float = 3,
     env_cutoff: float = 7,
     start: Optional[int] = None,
@@ -806,27 +805,25 @@ def extract_subsystems(
         List of capped subsystems
     """
 
-    assert len(rad_idxs) > 0, "Error: At least one radical must be given!"
+    assert len(rad_ids) > 0, "Error: At least one radical must be given!"
 
-    rads: list[mda.AtomGroup] = [u.select_atoms(f"index {rad}") for rad in rad_idxs]
+    rads: list[mda.AtomGroup] = [u.select_atoms(f"id {rad}") for rad in rad_ids]
 
     # Delete bonds between radicals
-    if len(rad_idxs) > 1:
-        combs = combinations(rad_idxs, 2)
+    if len(rad_ids) > 1:
+        combs = combinations(rad_ids, 2)
         for c in combs:
             try:
                 u.delete_bonds([c])
             except ValueError:
                 continue
 
-    print("Calculating radical neighbors..")
-    bonded_all = [u.select_atoms(f"bonded index {rad}") for rad in rad_idxs]
+    bonded_all = [u.select_atoms(f"bonded id {rad}") for rad in rad_ids]
     # remove rads
     bonded_all: list[mda.AtomGroup] = [b - sum(rads) for b in bonded_all]
 
     # correct residue of radicals to avoid residues w/ only 2 atoms
     # Necessary in case of backbone break other than peptide bond
-    print("Correcting residue of radical group..")
     for rad, bonded_rad in zip(rads, bonded_all):
         if len(bonded_rad.residues) == 1:
             continue
@@ -843,7 +840,7 @@ def extract_subsystems(
 
     cut_systems = {}
 
-    for ts in tqdm(u.trajectory[slice(start, stop, step)]):
+    for ts in u.trajectory[slice(start, stop, step)]:
         for i, (rad, bonded_rad) in enumerate(zip(rads, bonded_all)):
             # skip small distances
             skip = False
@@ -877,8 +874,8 @@ def extract_subsystems(
                 # skip existing systems w/ bigger translation
                 if new_i_hash in cut_systems.keys():
                     if cut_sys_dict["meta"]["translation"] > cut_systems[new_i_hash][0]:
-                        print("Skipping due to translation")
-                        print(
+                        logger.debug("Skipping due to translation")
+                        logger.debug(
                             cut_sys_dict["meta"]["translation"],
                             cut_systems[new_i_hash][0],
                         )
@@ -889,11 +886,11 @@ def extract_subsystems(
                     cut_sys_dict,
                 )
 
-    print(f"Created {len(cut_systems)} isolated systems.")
+    logger.debug(f"Created {len(cut_systems)} isolated systems.")
     return list(cut_systems.values())
 
 
-def save_capped_systems(systems, out_dir):
+def save_capped_systems(systems, out_dir, frame: int = None):
     """Saves output from `extract_subsystems`
 
     Parameters
@@ -902,22 +899,27 @@ def save_capped_systems(systems, out_dir):
         Systems to save the structures and meta file for.
     out_dir : Path
         Where to save. Should probably be traj/batch_238/se
+    frame
+        Overwrite the frame for all given systems
     """
     if not out_dir.exists():
         out_dir.mkdir(parents=True)
 
-    for system in tqdm(systems):
+    for system in systems:
         system = system[1]  # 0 is translation
         sys_hash = f'{system["meta"]["hash_u1"]}_{system["meta"]["hash_u2"]}'
 
         if (out_dir / f"{sys_hash}.npz").exists():
-            print(f"ERROR: {sys_hash} hash exists!")
+            # print(f"ERROR: {sys_hash} hash exists!")
             continue
 
         system["start_u"].atoms.write(out_dir / f"{sys_hash}_1.pdb")
         system["end_u"].atoms.write(out_dir / f"{sys_hash}_2.pdb")
 
         system["meta"]["meta_path"] = out_dir / f"{sys_hash}.npz"
+
+        if frame is not None:
+            system["meta"]["frame"] = frame
 
         np.savez(out_dir / f"{sys_hash}.npz", system["meta"])
 
@@ -935,6 +937,7 @@ def make_radicals(
     h_cutoff=3,
     out_dir=None,
     h_index=None,
+    logger: logging.Logger = logging.getLogger(__name__),
 ):
     """Takes non radical trajectory and makes radical
     trajectories from it.
@@ -964,7 +967,9 @@ def make_radicals(
     out_dir : Path
         If give, capped systems are saved after each generated radical
     h_index : int
-        For debugging, index of H to select, instead of chosing a random one. By default None
+        For debugging, id of H to select, instead of chosing a random one. By default None
+    logger:
+        logger instance, optional
     """
 
     all_heavy = u.select_atoms("not element H")
@@ -977,9 +982,9 @@ def make_radicals(
 
     capped_systems = []
     if h_index is not None:
-        sel_Hs = [u.select_atoms(f"index {h_index}")[0]]
+        sel_Hs = [u.select_atoms(f"id {h_index}")[0]]
     for sel_H in sel_Hs:
-        print(f"Selected H to remove: {sel_H}")
+        logger.debug(f"Selected H to remove: {sel_H}")
         rad = sel_H.bonded_atoms
 
         # remove one H and reorder atoms
@@ -999,16 +1004,16 @@ def make_radicals(
                 h_cutoff=h_cutoff,
             )
         except Exception as e:
-            print(f"Selected H: {sel_H}")
+            logger.debug(f"Selected H: {sel_H}")
             raise e
 
         for sub in subs:
-            sub[1]["meta"]["traj_H"] = sel_H.index
+            sub[1]["meta"]["traj_H"] = sel_H.id
         capped_systems.extend(subs)
 
         if out_dir is not None:
             save_capped_systems(subs, out_dir)
-            print(f"Saved {len(subs)} systems in {out_dir}")
+            logger.debug(f"Saved {len(subs)} systems in {out_dir}")
 
     return capped_systems
 
@@ -1030,6 +1035,7 @@ def make_radicals_smart(
     unique=True,
     h_cutoff=1.7,
     out_dir=None,
+    logger: logging.Logger = logging.getLogger(__name__),
 ):
     """Takes non radical trajectory and makes radical
     trajectories from it.
@@ -1063,16 +1069,18 @@ def make_radicals_smart(
         Cutoff radius for hydrogen translation, used to preselect Hs, by default 1.7
     out_dir : Path
         If give, capped systems are saved after each generated radical
+    logger:
+        logger instance, optional
     """
     all_heavy = u.select_atoms("not element H")
     all_Hs = u.select_atoms("element H")
 
     sub_Hs = []
-    for ts in tqdm(u.trajectory[start:stop:search_step], "Searching close H"):
+    for ts in u.trajectory[start:stop:search_step]:
         # define smaller sub-search spaces
         for _ in range(20):
-            center_idx = all_Hs[random.sample(range(len(all_Hs)), 1)][0].index
-            local_Hs = all_Hs.select_atoms(f"around 15 index {center_idx}")
+            center_idx = all_Hs[random.sample(range(len(all_Hs)), 1)][0].id
+            local_Hs = all_Hs.select_atoms(f"around 15 id {center_idx}")
 
             d = self_distance_array(local_Hs.positions)
             k = 0
@@ -1083,9 +1091,9 @@ def make_radicals_smart(
                         sub_Hs.append((local_Hs[j], d[k], ts.frame))
                     k += 1
     sub_Hs = np.array(sub_Hs)
-    print("Found small distances:", sub_Hs.shape)
+    logger.debug("Found small distances:", sub_Hs.shape)
     sub_Hs = sub_Hs[(np.unique(sub_Hs[:, 0], return_index=True))[1]]
-    print("Found unique systems:", sub_Hs.shape)
+    logger.debug("Found unique systems:", sub_Hs.shape)
 
     # sample uniformly across found distances
     rng = np.random.default_rng()
@@ -1101,13 +1109,13 @@ def make_radicals_smart(
         mask.pop(masked_idx)
 
     sel_Hs = sub_Hs[idxs][:, [0, 2]]
-    print(
+    logger.debug(
         f"Selected {len(idxs)} Hs at distances from {sub_Hs[:, 1].min():.02f} to {sub_Hs[:, 1].max():.02f}"
     )
     # Building of universes
     capped_systems = []
     for sel_H, frame in sel_Hs:
-        print(f"Selected H to remove: {sel_H}")
+        logger.debug(f"Selected H to remove: {sel_H}")
         rad = sel_H.bonded_atoms
 
         # remove one H and reorder atoms
@@ -1127,14 +1135,14 @@ def make_radicals_smart(
                 h_cutoff=h_cutoff,
             )
         except Exception as e:
-            print(f"Selected H: {sel_H}")
+            logger.debug(f"Selected H: {sel_H}")
             raise e
         for sub in subs:
-            sub[1]["meta"]["traj_H"] = sel_H.index
+            sub[1]["meta"]["traj_H"] = sel_H.id
         capped_systems.extend(subs)
 
         if out_dir is not None:
             save_capped_systems(subs, out_dir)
-            print(f"Saved {len(subs)} systems in {out_dir}")
+            logger.debug(f"Saved {len(subs)} systems in {out_dir}")
 
     return capped_systems

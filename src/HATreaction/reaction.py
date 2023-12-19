@@ -15,6 +15,7 @@ from pprint import pformat
 from tempfile import TemporaryDirectory
 import shutil
 from pathlib import Path
+from tqdm.autonotebook import tqdm
 
 
 class HAT_reaction(ReactionPlugin):
@@ -64,7 +65,7 @@ class HAT_reaction(ReactionPlugin):
         from HATreaction.utils.input_generation import create_meta_dataset_predictions
 
         logger = files.logger
-        logger.debug("Getting recipe for reaction: homolysis")
+        logger.debug("Getting recipe for reaction: HAT")
 
         tpr = str(files.input["tpr"])
         trr = str(files.input["trr"])
@@ -77,48 +78,29 @@ class HAT_reaction(ReactionPlugin):
             se_dir = Path(se_tmpdir.name)
 
         if getattr(self.config, "radicals", None) is not None:
-            rad_idxs = self.config.radicals
+            rad_ids = self.config.radicals
         else:
             # One-based strings in top
-            rad_idxs = [str(int(i) - 1) for i in self.runmng.top.radicals.keys()]
-        if len(rad_idxs) < 1:
+            rad_ids = [str(int(i) - 1) for i in self.runmng.top.radicals.keys()]
+        if len(rad_ids) < 1:
             logger.debug("No radicals known, searching in structure..")
-            rad_idxs = [str(a[0].index) for a in find_radicals(u)]
-        logger.info(f"Found radicals: {len(rad_idxs)}")
-        if len(rad_idxs) < 1:
+            rad_ids = [str(a[0].id) for a in find_radicals(u)]
+        logger.info(f"Found radicals: {len(rad_ids)}")
+        if len(rad_ids) < 1:
             logger.info("--> retuning empty recipe collection")
             return RecipeCollection([])
-        rad_idxs = sorted(rad_idxs)
+        rad_ids = sorted(rad_ids)
         sub_atms = u.select_atoms(
-            f"((not resname SOL NA CL) and (around 20 index {' '.join([i for i in rad_idxs])}))"
-            f" or index {' '.join([i for i in rad_idxs])}",
+            f"((not resname SOL NA CL) and (around 20 id {' '.join([i for i in rad_ids])}))"
+            f" or id {' '.join([i for i in rad_ids])}",
             updating=True,
         )
-
         try:
-            # every 10 rate queries, update environment selection around radical
-            for ts in u.trajectory[:: self.polling_rate * 10]:
+            # environment around radical is updated by ts incrementation
+            logger.info("Searching trajectory for radical structures.")
+            for ts in tqdm(u.trajectory[:: self.polling_rate]):
                 u_sub = MDA.Merge(sub_atms)
-                u_sub.load_new(str(trr), sub=sub_atms.indices)
-                sub_start_t = ts.frame
-                sub_end_t = ts.frame + self.polling_rate * 10
-
-                # subuni has different indices, translate: id 0-based!!!
-                rad_idxs_sub = sorted(
-                    list(
-                        map(
-                            str,
-                            u_sub.select_atoms(
-                                f"id {' '.join([i for i in rad_idxs])}"
-                            ).indices,
-                        )
-                    )
-                )
-
-                for r_s, r in zip(rad_idxs_sub, rad_idxs):
-                    assert list(u_sub.atoms[int(r_s)].bonded_atoms.names) == list(
-                        u.atoms[int(r)].bonded_atoms.names
-                    )
+                u_sub.trajectory[0].dimensions = ts.dimensions
 
                 # check manually w/ ngl:
                 if 0:
@@ -132,24 +114,24 @@ class HAT_reaction(ReactionPlugin):
                             "params": {"sele": "", "radiusScale": 0.7},
                         },
                     ]
-                    view._set_selection("@" + ",".join(rad_idxs_sub), repr_index=1)
+                    view._set_selection("@" + ",".join(rad_ids), repr_index=1)
                     view.center()
                     view
 
                 subsystems = extract_subsystems(
                     u_sub,
-                    rad_idxs_sub,
+                    rad_ids,
                     h_cutoff=self.h_cutoff,
                     env_cutoff=10,
-                    start=sub_start_t,
-                    stop=sub_end_t,
-                    step=self.polling_rate,
+                    start=0,
+                    stop=1,
+                    step=1,
                     cap=False,
                     rad_min_dist=3,
                     unique=False,
                     logger=logger,
                 )
-                save_capped_systems(subsystems, se_dir)
+                save_capped_systems(subsystems, se_dir, frame=ts.frame)
 
             in_ds, es, scale_t, meta_ds, metas_masked = create_meta_dataset_predictions(
                 meta_files=list(se_dir.glob("*.npz")),
@@ -159,6 +141,7 @@ class HAT_reaction(ReactionPlugin):
             )
 
             # Make predictions
+            logger.info("Making predictions.")
             ys = []
             for model, m, s in zip(self.models, self.means, self.stds):
                 y = model.predict(in_ds).squeeze()
@@ -167,21 +150,14 @@ class HAT_reaction(ReactionPlugin):
             ys = np.mean(np.array(ys), 0)
 
             # Rate; RT=0.593 kcal/mol
+            logger.info("Creating Recipes.")
             rates = list(np.multiply(self.freqfac, np.float_power(np.e, (-ys / 0.593))))
             recipes = []
             logger.debug(f"Barriers:\n{pformat(ys)}")
             logger.info(f"Max Rate: {max(rates)}, predicted {len(rates)} rates")
             logger.debug(f"Rates:\n{pformat(rates)}")
             for meta_d, rate in zip(meta_ds, rates):
-                sub_idxs = meta_d["indices"][0:2]
-                idxs = [
-                    u_sub.select_atoms(f"index {sub_idx}").ids for sub_idx in sub_idxs
-                ]
-                assert all(
-                    [len(i) == 1 for i in idxs]
-                ), f"HAT atom index translation error! \n{meta_d}"
-                # idxs = [idx[0] + 1 for idx in idxs] # one-based
-                idxs = [int(idx[0]) for idx in idxs]  # zero-based
+                ids = [int(i) for i in meta_d["indices"][0:2]]  # should be zero-based
 
                 f1 = meta_d["frame"]
                 f2 = meta_d["frame"] + self.polling_rate
@@ -189,7 +165,7 @@ class HAT_reaction(ReactionPlugin):
                     f2 = len(u.trajectory) - 1
                 t1 = u.trajectory[f1].time
                 t2 = u.trajectory[f2].time
-                old_bound = int(u.select_atoms(f"bonded index {idxs[0]}")[0].index)
+                old_bound = int(u_sub.select_atoms(f"bonded id {ids[0]}")[0].id)
 
                 # get end position
                 pdb_e = meta_d["meta_path"].with_name(
@@ -204,15 +180,15 @@ class HAT_reaction(ReactionPlugin):
                             x = float(line[30:38].strip())
                             y = float(line[38:46].strip())
                             z = float(line[46:54].strip())
-
                 if self.config.change_coords == "place":
+                    # HAT plugin ids are kimmdy ixs (zero-based,int)
                     seq = [
-                        Break(old_bound, idxs[0]),
-                        Place(ix_to_place=idxs[0], new_coords=[x, y, z]),
-                        Bind(idxs[0], idxs[1]),
+                        Break(old_bound, ids[0]),
+                        Place(ix_to_place=ids[0], new_coords=[x, y, z]),
+                        Bind(ids[0], ids[1]),
                     ]
                 elif self.config.change_coords == "lambda":
-                    seq = [Break(old_bound, idxs[0]), Bind(idxs[0], idxs[1]), Relax()]
+                    seq = [Break(old_bound, ids[0]), Bind(ids[0], ids[1]), Relax()]
                 else:
                     raise ValueError(
                         f"Unknown change_coords parameter {self.config.change_coords}"
