@@ -97,7 +97,7 @@ class HAT_reaction(ReactionPlugin):
         )
         try:
             # environment around radical is updated by ts incrementation
-            logger.info(f"Searching trajectory for radical structures.")
+            logger.info("Searching trajectory for radical structures.")
             for ts in tqdm(u.trajectory[:: self.polling_rate]):
                 u_sub = MDA.Merge(sub_atms)
                 u_sub.trajectory[0].dimensions = ts.dimensions
@@ -131,7 +131,7 @@ class HAT_reaction(ReactionPlugin):
                     unique=False,
                     logger=logger,
                 )
-                save_capped_systems(subsystems, se_dir)
+                save_capped_systems(subsystems, se_dir, frame=ts.frame)
 
             in_ds, es, scale_t, meta_ds, metas_masked = create_meta_dataset_predictions(
                 meta_files=list(se_dir.glob("*.npz")),
@@ -180,7 +180,6 @@ class HAT_reaction(ReactionPlugin):
                             x = float(line[30:38].strip())
                             y = float(line[38:46].strip())
                             z = float(line[46:54].strip())
-
                 if self.config.change_coords == "place":
                     # HAT plugin ids are kimmdy ixs (zero-based,int)
                     seq = [

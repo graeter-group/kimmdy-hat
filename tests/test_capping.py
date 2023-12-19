@@ -18,6 +18,7 @@ def pickle_universe():
         in_memory=True,
     )
     u.add_TopologyAttr("elements", u.atoms.types)
+    u.atoms.ids = u.atoms.ix
     with open(Path(__file__).parent / "test_capping_io" / "universe.pckl", "wb") as f:
         pickle.dump(u, f)
 
