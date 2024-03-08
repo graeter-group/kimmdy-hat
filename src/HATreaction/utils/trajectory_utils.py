@@ -574,46 +574,81 @@ def extract_single_rad(
     for h_idx, h in enumerate(hs):
         for end_idx, end_pos in enumerate(end_poss):
             clashes[h_idx, end_idx] = check_cylinderclash(
-                end_pos, h.position, env.positions, r_min=0.8
+                end_pos, h.position, env.positions, r_min=0.80
             )
 
-    cut_systems = np.zeros((len(hs),), dtype=object)
-    min_translations = np.ones((len(hs),)) * 99
+    # Orignal version: Each H atom is assigend to the end position with the smallest distance
+    if False: 
+        cut_systems = np.zeros((len(hs),), dtype=object)
+        min_translations = np.ones((len(hs),)) * 99
 
-    # iterate over defined HAT reactions
-    for h_idx, end_idx in zip(*np.nonzero(clashes)):
-        end_pos = end_poss[end_idx]
-        h = env.select_atoms(f"id {hs[h_idx].id}")
+        # iterate over defined HAT reactions
+        for h_idx, end_idx in zip(*np.nonzero(clashes)):
+            end_pos = end_poss[end_idx]
+            h = env.select_atoms(f"id {hs[h_idx].id}")
 
-        translation = np.linalg.norm(end_pos - h.positions)
-        # only keep reaction w/ smallest translation
-        # there can be multiple end positions for one rad!
-        if translation > min_translations[h_idx]:
-            continue
-        min_translations[h_idx] = translation
+            translation = np.linalg.norm(end_pos - h.positions)
+            # only keep reaction w/ smallest translation
+            # there can be multiple end positions for one rad!
+            if translation > min_translations[h_idx]:
+                continue
+            min_translations[h_idx] = translation
 
-        other_atms = env - h - rad
+            other_atms = env - h - rad
 
-        cut_systems[h_idx] = {
-            "start_u": mda.core.universe.Merge(h, rad, other_atms),
-            "end_u": mda.core.universe.Merge(h, rad, other_atms),
-            "meta": {
-                "translation": translation,
-                "u1_name": rad[0].resname.lower() + "-sim",
-                "u2_name": h[0].resname.lower() + "-sim",
-                "trajectory": u._trajectory.filename,
-                "frame": ts.frame,
-                "indices": (*h.ids, *rad.ids, *other_atms.ids),
-                "intramol": rad[0].residue == h[0].residue,
-            },
-        }
+            cut_systems[h_idx] = {
+                "start_u": mda.core.universe.Merge(h, rad, other_atms),
+                "end_u": mda.core.universe.Merge(h, rad, other_atms),
+                "meta": {
+                    "translation": translation,
+                    "u1_name": rad[0].resname.lower() + "-sim",
+                    "u2_name": h[0].resname.lower() + "-sim",
+                    "trajectory": u._trajectory.filename,
+                    "frame": ts.frame,
+                    "indices": (*h.ids, *rad.ids, *other_atms.ids),
+                    "intramol": rad[0].residue == h[0].residue,
+                },
+            }
 
-        # change H position in end universe
-        cut_systems[h_idx]["end_u"].atoms[0].position = end_pos
+            # change H position in end universe
+            cut_systems[h_idx]["end_u"].atoms[0].position = end_pos
 
-        # hashes based on systems rather than subgroups, subgroubs would collide
-        cut_systems[h_idx]["meta"]["hash_u1"] = abs(hash(cut_systems[h_idx]["start_u"]))
-        cut_systems[h_idx]["meta"]["hash_u2"] = abs(hash(cut_systems[h_idx]["end_u"]))
+            # hashes based on systems rather than subgroups, subgroubs would collide
+            cut_systems[h_idx]["meta"]["hash_u1"] = abs(hash(cut_systems[h_idx]["start_u"]))
+            cut_systems[h_idx]["meta"]["hash_u2"] = abs(hash(cut_systems[h_idx]["end_u"]))
+    # Adapted version: Each H atom is allowed to have multiple end positions
+    else:
+        cut_systems = np.zeros((clashes.sum(),), dtype=object)
+
+        # iterate over defined HAT reactions
+        for sys_idx, (h_idx, end_idx) in enumerate(zip(*np.nonzero(clashes))):
+            end_pos = end_poss[end_idx]
+            h = env.select_atoms(f"id {hs[h_idx].id}")
+
+            translation = np.linalg.norm(end_pos - h.positions)
+
+            other_atms = env - h - rad
+
+            cut_systems[sys_idx] = {
+                "start_u": mda.core.universe.Merge(h, rad, other_atms),
+                "end_u": mda.core.universe.Merge(h, rad, other_atms),
+                "meta": {
+                    "translation": translation,
+                    "u1_name": rad[0].resname.lower() + "-sim",
+                    "u2_name": h[0].resname.lower() + "-sim",
+                    "trajectory": u._trajectory.filename,
+                    "frame": ts.frame,
+                    "indices": (*h.ids, *rad.ids, *other_atms.ids),
+                    "intramol": rad[0].residue == h[0].residue,
+                },
+            }
+
+            # change H position in end universe
+            cut_systems[sys_idx]["end_u"].atoms[0].position = end_pos
+
+            # hashes based on systems rather than subgroups, subgroubs would collide
+            cut_systems[sys_idx]["meta"]["hash_u1"] = abs(hash(cut_systems[sys_idx]["start_u"]))
+            cut_systems[sys_idx]["meta"]["hash_u2"] = abs(hash(cut_systems[sys_idx]["end_u"]))
 
     return cut_systems[np.nonzero(cut_systems)[0]]
 
