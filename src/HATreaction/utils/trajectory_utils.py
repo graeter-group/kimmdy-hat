@@ -12,8 +12,9 @@ from scipy.spatial.transform import Rotation
 from HATreaction.utils.utils import check_cylinderclash
 from typing import Optional
 import numpy.typing as npt
+from pathlib import Path
 
-version = 0.7
+version = 0.8
 
 
 def find_radical_pos(
@@ -81,7 +82,7 @@ def find_radical_pos(
     # Radicals w/ only one bond:
     elif len(bonded) == 1:
         # suggest positions in a 109.5 degree cone
-        assert center.element in ["N","O", "S"], "Element type does not match bond number"
+        assert center.element in ["N", "O", "S"], f"Element {center.element} type does not match bond number"
         if center.element == "O":
             scale = scale_O
         elif center.element == "S":
@@ -646,7 +647,8 @@ def cap_single_rad(u, ts, rad, bonded_rad, h_cutoff=3, env_cutoff=15):
     """
     # selecting in a smaller env is faster than in whole universe
     env = u.atoms.select_atoms(
-        f"point { str(rad.positions).strip('[ ]') } {env_cutoff}"
+        f"(point { str(rad.positions).strip('[ ]') } {env_cutoff}) and "
+        "(not resname SOL)"
     )
     # ts2 = mda.transformations.unwrap(env)(ts)
     # env.unwrap()
@@ -733,7 +735,7 @@ def cap_single_rad(u, ts, rad, bonded_rad, h_cutoff=3, env_cutoff=15):
                 "charge_u2": _get_charge(h[0]),
                 "trajectory": u._trajectory.filename,
                 "frame": ts.frame,
-                "indices": (*h.id, *rad.id, *caps_id, *h_aa.id, *rad_aa.id),
+                "indices": (*h.ids, *rad.ids, *caps_id, *h_aa.ids, *rad_aa.ids),
                 "intramol": rad[0].residue == h[0].residue,
                 "charge": sum([_get_charge(res.atoms[0]) for res in core.residues])
                 + charge_correction,
@@ -779,7 +781,7 @@ def extract_subsystems(
     ----------
     u
         Main universe
-    rad_idxs
+    rad_ids
         Indices of the two radical atoms
     h_cutoff
         Cutoff radius for hydrogen search around radical, by default 3
@@ -818,7 +820,7 @@ def extract_subsystems(
             except ValueError:
                 continue
 
-    bonded_all = [u.select_atoms(f"bonded id {rad}") for rad in rad_ids]
+    bonded_all = [rad[0].bonded_atoms for rad in rads]
     # remove rads
     bonded_all: list[mda.AtomGroup] = [b - sum(rads) for b in bonded_all]
 
@@ -974,6 +976,10 @@ def make_radicals(
 
     all_heavy = u.select_atoms("not element H")
     all_H = u.select_atoms("element H")
+
+    # Make ids unique. ids are persistent in subuniverses, indices not
+    u.atoms.ids = u.atoms.indices + 1
+
     if resnames is None:
         sel_Hs = all_H[random.sample(range(len(all_H)), count)]
     else:
@@ -1074,6 +1080,9 @@ def make_radicals_smart(
     """
     all_heavy = u.select_atoms("not element H")
     all_Hs = u.select_atoms("element H")
+
+    # Make ids unique. ids are persistent in subuniverses, indices not
+    u.atoms.ids = u.atoms.indices + 1
 
     sub_Hs = []
     for ts in u.trajectory[start:stop:search_step]:

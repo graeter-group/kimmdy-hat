@@ -70,6 +70,8 @@ class HAT_reaction(ReactionPlugin):
         tpr = str(files.input["tpr"])
         trr = str(files.input["trr"])
         u = MDA.Universe(str(tpr), str(trr))
+        # Make ids unique. ids are persistent in subuniverses, indices not
+        u.atoms.ids = u.atoms.indices + 1
 
         se_dir = files.outputdir / "se"
         if not self.config.keep_structures:
@@ -81,7 +83,7 @@ class HAT_reaction(ReactionPlugin):
             rad_ids = self.config.radicals
         else:
             # One-based strings in top
-            rad_ids = [str(int(i) - 1) for i in self.runmng.top.radicals.keys()]
+            rad_ids = list(self.runmng.top.radicals.keys())
         if len(rad_ids) < 1:
             logger.debug("No radicals known, searching in structure..")
             rad_ids = [str(a[0].id) for a in find_radicals(u)]
@@ -157,7 +159,7 @@ class HAT_reaction(ReactionPlugin):
             logger.info(f"Max Rate: {max(rates)}, predicted {len(rates)} rates")
             logger.debug(f"Rates:\n{pformat(rates)}")
             for meta_d, rate in zip(meta_ds, rates):
-                ids = [int(i) for i in meta_d["indices"][0:2]]  # should be zero-based
+                ids = [str(i) for i in meta_d["indices"][0:2]]  # one-based as ids are written
 
                 f1 = meta_d["frame"]
                 f2 = meta_d["frame"] + self.polling_rate
@@ -165,7 +167,7 @@ class HAT_reaction(ReactionPlugin):
                     f2 = len(u.trajectory) - 1
                 t1 = u.trajectory[f1].time
                 t2 = u.trajectory[f2].time
-                old_bound = int(u_sub.select_atoms(f"bonded id {ids[0]}")[0].id)
+                old_bound = str(u_sub.select_atoms(f"bonded id {ids[0]}")[0].id)
 
                 # get end position
                 pdb_e = meta_d["meta_path"].with_name(
@@ -183,12 +185,12 @@ class HAT_reaction(ReactionPlugin):
                 if self.config.change_coords == "place":
                     # HAT plugin ids are kimmdy ixs (zero-based,int)
                     seq = [
-                        Break(old_bound, ids[0]),
-                        Place(ix_to_place=ids[0], new_coords=[x, y, z]),
-                        Bind(ids[0], ids[1]),
+                        Break(atom_id_1=old_bound, atom_id_2=ids[0]),
+                        Place(id_to_place=ids[0], new_coords=[x, y, z]),
+                        Bind(atom_id_1=ids[0], atom_id_2=ids[1]),
                     ]
                 elif self.config.change_coords == "lambda":
-                    seq = [Break(old_bound, ids[0]), Bind(ids[0], ids[1]), Relax()]
+                    seq = [Break(atom_id_1=old_bound, atom_id_2=ids[0]), Bind(atom_id_1=ids[0], atom_id_2=ids[1]), Relax()]
                 else:
                     raise ValueError(
                         f"Unknown change_coords parameter {self.config.change_coords}"

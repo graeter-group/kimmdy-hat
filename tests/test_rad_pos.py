@@ -1,10 +1,11 @@
+# %%
 import MDAnalysis as MDA
 from pathlib import Path
 from HATreaction.utils.trajectory_utils import find_radical_pos
 import json
 
 
-def view_generator(pdb):
+def view_generator(pdb, numbers=True):
     import nglview as ngl
 
     u = MDA.Universe(pdb, guess_bonds=True)
@@ -17,15 +18,14 @@ def view_generator(pdb):
                 "sele": "all",
             },
         },
-        {
-            "type": "label",
-            "params": {
-                "sele": "all",
-                "color": "black",
-                "labelType": "atomindex",
-            },
-        },
     ]
+    if numbers:
+        view.add_representation(
+            "label",
+            "all",
+            color="black",
+            labelType="atomindex",
+        )
 
     idx = pdb.stem.split("_")[-1]
 
@@ -91,10 +91,8 @@ def test_radical_pos():
 
 # %%
 def make_views():
-    for pdb in Path(
-        "/hits/fast/mbm/hartmaec/workdir/dopa_kimmdy/run_debug/kimmdy10ns_000/7_hat_reaction/se"
-    ).glob("*_1.pdb"):
-        yield view_generator(pdb)[1]
+    for pdb in Path("test_rad_pos").glob("*.pdb"):
+        yield view_generator(pdb, False)[1]
 
 
 # %%
@@ -103,4 +101,10 @@ if __name__ == "__main__":
 
 # %%
 if __name__ == "__main__":
-    next(iter)
+    view = next(iter)
+    view
+
+# %%
+
+    view.download_image("/hits/fast/mbm/riedmiki/img_1.png", trim=True)
+# %%
