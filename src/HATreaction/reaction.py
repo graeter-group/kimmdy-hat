@@ -58,8 +58,11 @@ class HAT_reaction(ReactionPlugin):
             self.stds.append(std)
 
         self.h_cutoff = self.config.h_cutoff
-        self.freqfac = self.config.frequency_factor
         self.polling_rate = self.config.polling_rate
+        self.frequency_factor = self.config.arrhenius_equation.frequency_factor
+        self.temperature = self.config.arrhenius_equation.temperature
+        self.R = 8.31446261815324e-3 # [kJ K-1 mol-1]
+
 
     def get_recipe_collection(self, files) -> RecipeCollection:
         from HATreaction.utils.input_generation import create_meta_dataset_predictions
@@ -153,7 +156,7 @@ class HAT_reaction(ReactionPlugin):
 
             # Rate; RT=0.593 kcal/mol
             logger.info("Creating Recipes.")
-            rates = list(np.multiply(self.freqfac, np.float_power(np.e, (-ys / 0.593))))
+            rates = list(np.multiply(self.frequency_factor, np.float_power(np.e, (-ys /(self.temperature * self.R)))))
             recipes = []
             logger.debug(f"Barriers:\n{pformat(ys)}")
             logger.info(f"Max Rate: {max(rates)}, predicted {len(rates)} rates")
