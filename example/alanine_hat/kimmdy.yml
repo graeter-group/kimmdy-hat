@@ -7,23 +7,25 @@ ff: 'amber99sb-star-ildnp.ff' # optional, dir endinng with .ff by default
 top: 'Ala_out.top'
 gro: 'npt.gro'
 ndx: 'index.ndx'
-tau_scale: 1e-34
+tau_scale: 1e-9
 mds:
   equilibrium:
     mdp: 'md.mdp'
-  relax:
-    mdp: 'md_slow_growth.mdp'
 changer:
   topology:
-    parameterization: 'basic'
+    parameterization: grappa
+  coordinates:
+    slow_growth: false
 reactions:
   hat_reaction:
-    frequency_factor: 100000000
+    arrhenius_equation:
+      frequency_factor: 0.288
+      temperature: 300
     h_cutoff: 3
     polling_rate: 1
     change_coords: 'place'
     keep_structures: true
-plot_rates: True
+plot_rates: true
 
 sequence:
 - equilibrium
