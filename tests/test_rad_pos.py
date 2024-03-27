@@ -104,7 +104,7 @@ if __name__ == "__main__":
     view = next(iter)
     view
 
-# %%
+    # %%
 
     view.download_image("/hits/fast/mbm/riedmiki/img_1.png", trim=True)
 # %%

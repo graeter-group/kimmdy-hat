@@ -15,7 +15,9 @@ class DummyRunmanager:
     config = DummyClass()
     config.reactions = DummyClass()
     config.reactions.Hat_reaction = DummyClass()
-    config.reactions.Hat_reaction.frequency_factor = 1e8
+    config.reactions.Hat_reaction.arrhenius_equation = DummyClass()
+    config.reactions.Hat_reaction.arrhenius_equation.frequency_factor = 1e8
+    config.reactions.Hat_reaction.arrhenius_equation.temperature = 300
     config.reactions.Hat_reaction.h_cutoff = 3
     config.reactions.Hat_reaction.model = None
     config.reactions.Hat_reaction.ensemble_size = None

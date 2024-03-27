@@ -82,7 +82,11 @@ def find_radical_pos(
     # Radicals w/ only one bond:
     elif len(bonded) == 1:
         # suggest positions in a 109.5 degree cone
-        assert center.element in ["N", "O", "S"], f"Element {center.element} type does not match bond number"
+        assert center.element in [
+            "N",
+            "O",
+            "S",
+        ], f"Element {center.element} type does not match bond number"
         if center.element == "O":
             scale = scale_O
         elif center.element == "S":

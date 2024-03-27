@@ -61,8 +61,7 @@ class HAT_reaction(ReactionPlugin):
         self.polling_rate = self.config.polling_rate
         self.frequency_factor = self.config.arrhenius_equation.frequency_factor
         self.temperature = self.config.arrhenius_equation.temperature
-        self.R = 8.31446261815324e-3 # [kJ K-1 mol-1]
-
+        self.R = 1.9872159e-3  # [kcal K-1 mol-1]
 
     def get_recipe_collection(self, files) -> RecipeCollection:
         from HATreaction.utils.input_generation import create_meta_dataset_predictions
@@ -156,13 +155,20 @@ class HAT_reaction(ReactionPlugin):
 
             # Rate; RT=0.593 kcal/mol
             logger.info("Creating Recipes.")
-            rates = list(np.multiply(self.frequency_factor, np.float_power(np.e, (-ys /(self.temperature * self.R)))))
+            rates = list(
+                np.multiply(
+                    self.frequency_factor,
+                    np.float_power(np.e, (-ys / (self.temperature * self.R))),
+                )
+            )
             recipes = []
             logger.debug(f"Barriers:\n{pformat(ys)}")
             logger.info(f"Max Rate: {max(rates)}, predicted {len(rates)} rates")
             logger.debug(f"Rates:\n{pformat(rates)}")
             for meta_d, rate in zip(meta_ds, rates):
-                ids = [str(i) for i in meta_d["indices"][0:2]]  # one-based as ids are written
+                ids = [
+                    str(i) for i in meta_d["indices"][0:2]
+                ]  # one-based as ids are written
 
                 f1 = meta_d["frame"]
                 f2 = meta_d["frame"] + self.polling_rate
@@ -193,7 +199,11 @@ class HAT_reaction(ReactionPlugin):
                         Bind(atom_id_1=ids[0], atom_id_2=ids[1]),
                     ]
                 elif self.config.change_coords == "lambda":
-                    seq = [Break(atom_id_1=old_bound, atom_id_2=ids[0]), Bind(atom_id_1=ids[0], atom_id_2=ids[1]), Relax()]
+                    seq = [
+                        Break(atom_id_1=old_bound, atom_id_2=ids[0]),
+                        Bind(atom_id_1=ids[0], atom_id_2=ids[1]),
+                        Relax(),
+                    ]
                 else:
                     raise ValueError(
                         f"Unknown change_coords parameter {self.config.change_coords}"
