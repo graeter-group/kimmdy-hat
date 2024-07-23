@@ -138,6 +138,7 @@ class HAT_reaction(ReactionPlugin):
                 )
                 save_capped_systems(subsystems, se_dir, frame=ts.frame)
 
+            # Build input features
             in_ds, es, scale_t, meta_ds, metas_masked = create_meta_dataset_predictions(
                 meta_files=list(se_dir.glob("*.npz")),
                 batch_size=self.hparas["batchsize"],
