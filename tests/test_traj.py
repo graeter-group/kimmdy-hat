@@ -21,6 +21,7 @@ class DummyRunmanager:
     config.reactions.Hat_reaction.h_cutoff = 3
     config.reactions.Hat_reaction.model = None
     config.reactions.Hat_reaction.ensemble_size = None
+    config.reactions.Hat_reaction.prediction_scheme = "optimized"
     config.reactions.Hat_reaction.polling_rate = 10
     config.reactions.Hat_reaction.radicals = None
     config.reactions.Hat_reaction.change_coords = "place"

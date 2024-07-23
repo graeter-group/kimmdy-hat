@@ -58,6 +58,7 @@ class HAT_reaction(ReactionPlugin):
             self.stds.append(std)
 
         self.h_cutoff = self.config.h_cutoff
+        self.prediction_scheme = self.config.prediction_scheme
         self.polling_rate = self.config.polling_rate
         self.frequency_factor = self.config.arrhenius_equation.frequency_factor
         self.temperature = self.config.arrhenius_equation.temperature
@@ -146,12 +147,55 @@ class HAT_reaction(ReactionPlugin):
 
             # Make predictions
             logger.info("Making predictions.")
-            ys = []
-            for model, m, s in zip(self.models, self.means, self.stds):
-                y = model.predict(in_ds).squeeze()
-                ys.append((y * s) + m)
-            ys = np.stack(ys)
-            ys = np.mean(np.array(ys), 0)
+            if self.prediction_scheme == "complete":
+                ys = []
+                for model, m, s in zip(self.models, self.means, self.stds):
+                    y = model.predict(in_ds).squeeze()
+                    ys.append((y * s) + m)
+                ys = np.stack(ys)
+                ys = np.mean(np.array(ys), 0)
+            elif self.prediction_scheme == "optimized":
+                # hyperparameters
+                required_offset = 11 / (
+                    self.R * self.temperature
+                )  # offset to lowest barrier, 11RT offset means, the rates are less than one millionth of the highest rate
+                uncertainty = (
+                    3.5  # kcal/mol; expected error to QM of a single model prediction
+                )
+                # single prediction
+                model, m, s = next(zip(self.models, self.means, self.stds))
+                ys_single = model.predict(in_ds).squeeze()
+                # find where to recalculate with full ensemble (low barriers)
+                recalculate = ys_single <= (
+                    ys_single.min() + required_offset + uncertainty
+                )
+                # build reduced dataset
+                meta_files_recalculate = [
+                    s for s, r in zip(list(se_dir.glob("*.npz")), recalculate) if r
+                ]
+                in_ds_ensemble, _, _, _, _ = create_meta_dataset_predictions(
+                    meta_files=meta_files_recalculate,
+                    batch_size=self.hparas["batchsize"],
+                    mask_energy=False,
+                    oneway=True,
+                )
+                # ensemble prediction
+                ys_ensemble = []
+                for model, m, s in zip(self.models, self.means, self.stds):
+                    y_ensemble = model.predict(in_ds_ensemble).squeeze()
+                    ys_ensemble.append((y_ensemble * s) + m)
+                ys_ensemble = np.stack(ys_ensemble)
+                ys_ensemble = np.mean(np.array(ys_ensemble), 0)
+                ys_full_iter = iter(ys_ensemble)
+                # take ensemble prediction value where there was a recaulcation, else y_single
+                ys = np.asarray(
+                    [
+                        y_single if not r else next(ys_full_iter)
+                        for y_single, r in zip(ys_single, recalculate)
+                    ]
+                )
+            else:
+                raise ValueError
 
             # Rate; RT=0.593 kcal/mol
             logger.info("Creating Recipes.")

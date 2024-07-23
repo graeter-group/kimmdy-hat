@@ -46,6 +46,13 @@
         "pytype": "int",
         "default": null
       },
+      "prediction_scheme": {
+        "type": "string",
+        "description": "How to predict the reaction barrier. Current options: optimized, complete. Optimized first predicts the barrier with one model and if the barrier is sufficiently low, recalculates it with the complete ensemble. In the complete scheme, for all reactions the whole ensemble prediction is used.",
+        "pytype": "str",
+        "enum": ["optimized", "complete"],
+        "default": "optimized"
+      },
       "polling_rate": {
         "type": "integer",
         "description": "Polling rate, defaults to 10",
