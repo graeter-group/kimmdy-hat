@@ -48,10 +48,10 @@
       },
       "prediction_scheme": {
         "type": "string",
-        "description": "How to predict the reaction barrier. Current options: optimized, complete. Optimized first predicts the barrier with one model and if the barrier is sufficiently low, recalculates it with the complete ensemble. In the complete scheme, for all reactions the whole ensemble prediction is used.",
+        "description": "How to predict the reaction barrier. Current options: `efficient`, `all_models`. `efficient` first predicts the barriers with one model, and if a barrier is sufficiently low, recalculates it with the complete ensemble. In the `all_models` scheme, for all reactions the whole ensemble prediction is used.",
         "pytype": "str",
-        "enum": ["optimized", "complete"],
-        "default": "optimized"
+        "enum": ["all_models", "efficient"],
+        "default": "efficient"
       },
       "polling_rate": {
         "type": "integer",

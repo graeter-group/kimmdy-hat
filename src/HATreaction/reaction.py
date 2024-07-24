@@ -148,18 +148,18 @@ class HAT_reaction(ReactionPlugin):
 
             # Make predictions
             logger.info("Making predictions.")
-            if self.prediction_scheme == "complete":
+            if self.prediction_scheme == "all_models":
                 ys = []
                 for model, m, s in zip(self.models, self.means, self.stds):
                     y = model.predict(in_ds).squeeze()
                     ys.append((y * s) + m)
                 ys = np.stack(ys)
                 ys = np.mean(np.array(ys), 0)
-            elif self.prediction_scheme == "optimized":
+            elif self.prediction_scheme == "efficient":
                 # hyperparameters
-                required_offset = 11 / (
-                    self.R * self.temperature
-                )  # offset to lowest barrier, 11RT offset means, the rates are less than one millionth of the highest rate
+                # offset to lowest barrier, 11RT offset means, the rates
+                # are less than one millionth of the highest rate
+                required_offset = 11 / (self.R * self.temperature)
                 uncertainty = (
                     3.5  # kcal/mol; expected error to QM of a single model prediction
                 )
@@ -188,7 +188,8 @@ class HAT_reaction(ReactionPlugin):
                 ys_ensemble = np.stack(ys_ensemble)
                 ys_ensemble = np.mean(np.array(ys_ensemble), 0)
                 ys_full_iter = iter(ys_ensemble)
-                # take ensemble prediction value where there was a recaulcation, else y_single
+                # take ensemble prediction value where there was a recaulcation,
+                # else y_single
                 ys = np.asarray(
                     [
                         y_single if not r else next(ys_full_iter)
