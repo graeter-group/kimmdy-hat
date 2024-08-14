@@ -1,0 +1,66 @@
+{
+  "loss": "MAE",
+  "lr_start": 0.0008,
+  "lr_scheduler": "cos",
+  "lr_fraction": 0.01,
+  "out_emb": "poi",
+  "mlp_style": "static",
+  "mlp_layers": 2,
+  "mlp_size": 128,
+  "mlp_rep": 1,
+  "depth": 2,
+  "equiv_norm": false,
+  "node_norm": false,
+  "pooling": "sum",
+  "epochs": 250,
+  "batchsize": 128,
+  "cache": "/tmp/localstorage/cache1",
+  "val_split": 0.1,
+  "scale": false,
+  "max_dist": 3.0,
+  "min_dist": 0.0,
+  "opt": true,
+  "datasets": "dataset_2408_traj",
+  "date": "Tue Aug 13 18:03:30 2024",
+  "initial_epoch": 0,
+  "freeze_graph": false,
+  "new_mlp": false,
+  "eval_datasets": [
+    "dataset_2408_traj"
+  ]
+}
+{"mean_absolute_error": 4.551312189249115}
+##################
+{
+  "loss": "MAE",
+  "lr_start": 0.0008,
+  "lr_scheduler": "cos",
+  "lr_fraction": 0.01,
+  "out_emb": "poi",
+  "mlp_style": "static",
+  "mlp_layers": 2,
+  "mlp_size": 128,
+  "mlp_rep": 1,
+  "depth": 2,
+  "equiv_norm": false,
+  "node_norm": false,
+  "pooling": "sum",
+  "epochs": 250,
+  "batchsize": 128,
+  "cache": "/tmp/localstorage/cache1",
+  "val_split": 0.1,
+  "scale": false,
+  "max_dist": 2.0,
+  "min_dist": 0.0,
+  "opt": true,
+  "datasets": "dataset_2408_traj",
+  "date": "Tue Aug 13 18:03:30 2024",
+  "initial_epoch": 0,
+  "freeze_graph": false,
+  "new_mlp": false,
+  "eval_datasets": [
+    "dataset_2408_traj"
+  ]
+}
+{"mean_absolute_error": 3.6940122687499386}
+##################

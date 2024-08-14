@@ -8,11 +8,11 @@ from kgcnn.graph.adj import (
 from kgcnn.graph.adj import sort_edge_indices
 from ase.io import read
 from pathlib import Path
-from tqdm import tqdm
+from tqdm.autonotebook import tqdm
 import pandas as pd
 
 # KGCNN==2.1.0, tensorflow==2.10.0
-version = 0.4  # Also used in HATreaction pluginversion
+version = 0.5  # Also used in HATreaction pluginversion
 
 
 def _preproc_pdb(pdbs):
@@ -52,15 +52,6 @@ def _preproc_pdb(pdbs):
     radical_edge_index = tf.convert_to_tensor(((0,),), tf.int64)  # shape=(1,1)
     edge_dist = tf.convert_to_tensor(((dist[0, 1],),), tf.float32)  # shape=(1,1)
 
-    # atms = np.array([0, 1, 8, 8, 7, 6, 6, 6, 6, 6, 1, 1, 1, 1, 1, 1, 1, 1, 8, 8, 8, 7,
-    #    6, 6, 6, 6, 6, 1, 1, 1, 1, 1, 1, 1, 1])
-
-    # # np.save("/hits/fast/mbm/riedmiki/nn/barrier_gnn_out/cache2/tmp1", pos)
-    # # np.save("/hits/fast/mbm/riedmiki/nn/barrier_gnn_out/cache2/tmp2", edge_indices)
-
-    # pos = np.load("/hits/fast/mbm/riedmiki/nn/barrier_gnn_out/cache2/tmp1.npy")
-    # edge_indices= np.load("/hits/fast/mbm/riedmiki/nn/barrier_gnn_out/cache2/tmp2.npy")
-
     return (
         atms,
         pos,
@@ -74,7 +65,6 @@ def _preproc_pdb(pdbs):
 def _tf_preproc_pdb(pdbs):
     (
         atms,
-        # equivariant,
         pos,
         edge_indices,
         radical_node_index,
@@ -93,17 +83,13 @@ def _tf_preproc_pdb(pdbs):
         ),
     )
     atms.set_shape((None,))
-    # equivariant.set_shape((None, 128, 3))
     pos.set_shape((None, 3))
-    # edge_indices.set_shape((None, 2))
     edge_indices.set_shape((None, 2))
     radical_node_index.set_shape((None, 2))
     radical_edge_index.set_shape((None, 1))
     edge_dist.set_shape((None, 1))
 
-    # return atms, pos, edge_indices, radical_node_index
     return atms, pos, edge_indices, radical_node_index, radical_edge_index, edge_dist
-    # return atms, pos, edge_indices, radical_edge_index
 
 
 def mk_mols_ds(pdb_pairs):
@@ -147,7 +133,7 @@ def metas_to_ds(
         if "#" in name:  # duplicated meta files w/o dup pdbs
             name = name.rstrip("0123456789").rstrip("#")
         assert (
-            not "#" in name
+            "#" not in name
         ), f"ERROR duplicating pdb from {name}\nold name: {meta_f.stem}"
 
         pdbs1.append(
@@ -171,18 +157,24 @@ def metas_to_ds(
 
         # read energies
         if opt:
-            if "e_s_opt" in meta_d and "e_ts_opt" in meta_d and "e_e_opt" in meta_d:
+            if "e_s_opt" in meta_d and "e_ts_opt" in meta_d:
                 energies1.append(meta_d["e_ts_opt"] - meta_d["e_s_opt"])
+            else:
+                energies1.append(np.NaN)
+            if "e_e_opt" in meta_d and "e_ts_opt" in meta_d:
                 energies2.append(meta_d["e_ts_opt"] - meta_d["e_e_opt"])
-                continue
-        else:
-            if "e_max" in meta_d and "e_00" in meta_d and "e_10" in meta_d:
-                energies1.append(meta_d["e_max"] - meta_d["e_00"])
-                energies2.append(meta_d["e_max"] - meta_d["e_10"])
-                continue
+            else:
+                energies2.append(np.NaN)
 
-        energies1.append(np.NaN)
-        energies2.append(np.NaN)
+        else:
+            if "e_max" in meta_d and "e_00" in meta_d:
+                energies1.append(meta_d["e_max"] - meta_d["e_00"])
+            else:
+                energies1.append(np.NaN)
+            if "e_10" in meta_d and "e_00" in meta_d:
+                energies2.append(meta_d["e_max"] - meta_d["e_10"])
+            else:
+                energies2.append(np.NaN)
 
     if oneway:
         pdbs = np.array(pdbs1, dtype=str)
@@ -374,9 +366,9 @@ def create_meta_dataset(
     if cache:
         print("Initializing:", cache)
         for i in tqdm(train_ds, "Initializing train"):
-            ...
+            i
         for i in tqdm(val_ds, "Initializing val"):
-            ...
+            i
 
     if eval:
         return train_ds, val_ds, scale_t, len(ds_complete), meta_dicts

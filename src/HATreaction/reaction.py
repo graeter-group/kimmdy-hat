@@ -24,18 +24,30 @@ class HAT_reaction(ReactionPlugin):
         import tensorflow as tf
 
         logging.getLogger("tensorflow").setLevel("CRITICAL")
-        from tensorflow.keras.models import load_model
+        load_model = tf.keras.models.load_model
 
         super().__init__(*args, **kwargs)
 
         # Load model
-
         if getattr(self.config, "model", None) is None:
-            ens_glob = "[!_]*"
+            match self.runmng.config.changer.topology.parameterization:
+                case "basic":
+                    ens_glob = "classic_models"
+                case "grappa":
+                    ens_glob = "grappa_models"
+                case _:
+                    raise RuntimeError(
+                        "Unknown config.changer.topology.parametrization: "
+                        "{config.changer.topology.parametrization}"
+                    )
         else:
             ens_glob = self.config.model
 
-        ensemble_dir = list(res_files("HATmodels").glob(ens_glob))[0]
+        ensemble_dirs = list(res_files("HATmodels").glob(ens_glob + "*"))
+        assert len(ensemble_dirs) > 0, f"Model {ens_glob} not found. Please check your config yml."
+        assert len(ensemble_dirs) == 1, f"Multiple Models found for {ens_glob}. Please check your config yml."
+        ensemble_dir = ensemble_dirs[0]
+        logging.info(f"Using HAT model: {ensemble_dir.name}")
         ensemble_size = getattr(self.config, "enseble_size", None)
         self.models = []
         self.means = []

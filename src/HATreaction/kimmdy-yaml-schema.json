@@ -36,8 +36,9 @@
       },
       "model": {
         "type": "string",
-        "description": "Model name, optional",
+        "description": "Model name, optional. If not defined, will choose based on grappa usage in KIMMDY.",
         "pytype": "str",
+        "enum": ["grappa", "classic"],
         "default": null
       },
       "ensemble_size": {

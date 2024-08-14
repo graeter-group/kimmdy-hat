@@ -27,6 +27,9 @@ class DummyRunmanager:
     config.reactions.Hat_reaction.change_coords = "place"
     config.reactions.Hat_reaction.kmc = "extrande"
     config.reactions.Hat_reaction.keep_structures = False
+    config.changer = DummyClass()
+    config.changer.topology = DummyClass()
+    config.changer.topology.parameterization = "grappa"
 
     def __init__(self):
         self.top = DummyClass()
