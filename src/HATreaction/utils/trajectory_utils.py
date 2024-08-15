@@ -873,7 +873,8 @@ def extract_subsystems(
 
             for i, cut_sys_dict in enumerate(cut_frame):
                 if unique:
-                    new_i_hash = hash(cut_sys_dict["meta"]["indices"])
+                    # only h and rad index
+                    new_i_hash = hash(cut_sys_dict["meta"]["indices"][:2])
                 else:
                     new_i_hash = str(i) + str(rad.indices) + str(ts.frame)
 

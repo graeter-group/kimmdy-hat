@@ -34,6 +34,12 @@
         "pytype": "float",
         "default": 3
       },
+      "unique": {
+        "type": "boolean",
+        "description": "If true, only check barrier for smallest distance for one set of reacting atoms. Default False.",
+        "pytype": "bool",
+        "default": false
+      },
       "model": {
         "type": "string",
         "description": "Model name, optional. If not defined, will choose based on grappa usage in KIMMDY.",
@@ -49,7 +55,7 @@
       },
       "prediction_scheme": {
         "type": "string",
-        "description": "How to predict the reaction barrier. Current options: `efficient`, `all_models`. `efficient` first predicts the barriers with one model, and if a barrier is sufficiently low, recalculates it with the complete ensemble. In the `all_models` scheme, for all reactions the whole ensemble prediction is used.",
+        "description": "How to predict the reaction barrier. Current options: `efficient`, `all_models`. `efficient` first predicts the barriers with one model, and if a barrier is sufficiently low, recalculates it with the complete ensemble. In the `all_models` scheme, for all reactions the whole ensemble prediction is used. Default: `efficient`",
         "pytype": "str",
         "enum": ["all_models", "efficient"],
         "default": "efficient"
@@ -68,9 +74,9 @@
       },
       "change_coords": {
         "type": "string",
-        "description": "How to change coordinates. H can be placed at the new position, or a (lambda)-dynamics simulation can be performed. For lambda-dynamics, set up the coordinate changer with slow_growth=True",
+        "description": "How to change coordinates. H can be placed at the new position, or a (lambda)-dynamics simulation can be performed. For lambda-dynamics, set up the coordinate changer with slow_growth=True. Default: place",
         "pytype": "str",
-        "enum": ["place","lambda"],
+        "enum": ["place", "lambda"],
         "default": "place"
       },
       "kmc": {

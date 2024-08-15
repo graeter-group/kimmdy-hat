@@ -75,6 +75,7 @@ class HAT_reaction(ReactionPlugin):
         self.frequency_factor = self.config.arrhenius_equation.frequency_factor
         self.temperature = self.config.arrhenius_equation.temperature
         self.R = 1.9872159e-3  # [kcal K-1 mol-1]
+        self.unique = self.config.unique
 
     def get_recipe_collection(self, files) -> RecipeCollection:
         from HATreaction.utils.input_generation import create_meta_dataset_predictions
@@ -115,40 +116,39 @@ class HAT_reaction(ReactionPlugin):
         try:
             # environment around radical is updated by ts incrementation
             logger.info("Searching trajectory for radical structures.")
-            for ts in tqdm(u.trajectory[:: self.polling_rate]):
-                u_sub = MDA.Merge(sub_atms)
-                u_sub.trajectory[0].dimensions = ts.dimensions
+            u_sub = MDA.Merge(sub_atms)
+            # u_sub.trajectory[0].dimensions = ts.dimensions
+            # for ts in tqdm(u.trajectory[:: self.polling_rate]):
 
-                # check manually w/ ngl:
-                if 0:
-                    import nglview as ngl
+            #     # check manually w/ ngl:
+            #     if 0:
+            #         import nglview as ngl
 
-                    view = ngl.show_mdanalysis(u_sub, defaultRepresentation=False)
-                    view.representations = [
-                        {"type": "ball+stick", "params": {"sele": ""}},
-                        {
-                            "type": "spacefill",
-                            "params": {"sele": "", "radiusScale": 0.7},
-                        },
-                    ]
-                    view._set_selection("@" + ",".join(rad_ids), repr_index=1)
-                    view.center()
-                    view
-
-                subsystems = extract_subsystems(
-                    u_sub,
-                    rad_ids,
-                    h_cutoff=self.h_cutoff,
-                    env_cutoff=10,
-                    start=0,
-                    stop=1,
-                    step=1,
-                    cap=False,
-                    rad_min_dist=3,
-                    unique=False,
-                    logger=logger,
-                )
-                save_capped_systems(subsystems, se_dir, frame=ts.frame)
+            #         view = ngl.show_mdanalysis(u_sub, defaultRepresentation=False)
+            #         view.representations = [
+            #             {"type": "ball+stick", "params": {"sele": ""}},
+            #             {
+            #                 "type": "spacefill",
+            #                 "params": {"sele": "", "radiusScale": 0.7},
+            #             },
+            #         ]
+            #         view._set_selection("@" + ",".join(rad_ids), repr_index=1)
+            #         view.center()
+            #         view
+            subsystems = extract_subsystems(
+                u_sub,
+                rad_ids,
+                h_cutoff=self.h_cutoff,
+                env_cutoff=10,
+                start=None,
+                stop=None,
+                step=self.polling_rate,
+                cap=False,
+                rad_min_dist=3,
+                unique=self.unique,
+                logger=logger,
+            )
+            save_capped_systems(subsystems, se_dir)
 
             # Build input features
             in_ds, es, scale_t, meta_ds, metas_masked = create_meta_dataset_predictions(
@@ -163,7 +163,7 @@ class HAT_reaction(ReactionPlugin):
             if self.prediction_scheme == "all_models":
                 ys = []
                 for model, m, s in zip(self.models, self.means, self.stds):
-                    y = model.predict(in_ds).squeeze()
+                    y = model.predict(in_ds).reshape(-1)
                     ys.append((y * s) + m)
                 ys = np.stack(ys)
                 ys = np.mean(np.array(ys), 0)
@@ -177,7 +177,7 @@ class HAT_reaction(ReactionPlugin):
                 )
                 # single prediction
                 model, m, s = next(zip(self.models, self.means, self.stds))
-                ys_single = model.predict(in_ds).squeeze()
+                ys_single = model.predict(in_ds).reshape(-1)
                 # find where to recalculate with full ensemble (low barriers)
                 recalculate = ys_single <= (
                     ys_single.min() + required_offset + uncertainty
@@ -195,7 +195,7 @@ class HAT_reaction(ReactionPlugin):
                 # ensemble prediction
                 ys_ensemble = []
                 for model, m, s in zip(self.models, self.means, self.stds):
-                    y_ensemble = model.predict(in_ds_ensemble).squeeze()
+                    y_ensemble = model.predict(in_ds_ensemble).reshape(-1)
                     ys_ensemble.append((y_ensemble * s) + m)
                 ys_ensemble = np.stack(ys_ensemble)
                 ys_ensemble = np.mean(np.array(ys_ensemble), 0)
@@ -209,7 +209,7 @@ class HAT_reaction(ReactionPlugin):
                     ]
                 )
             else:
-                raise ValueError
+                raise ValueError()
 
             # Rate; RT=0.593 kcal/mol
             logger.info("Creating Recipes.")
