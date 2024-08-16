@@ -10,9 +10,11 @@ from ase.io import read
 from pathlib import Path
 from tqdm.autonotebook import tqdm
 import pandas as pd
+import logging
+from pickle import UnpicklingError
 
 # KGCNN==2.1.0, tensorflow==2.10.0
-version = 0.5  # Also used in HATreaction pluginversion
+version = 0.6  # Also used in HATreaction pluginversion
 
 
 def _preproc_pdb(pdbs):
@@ -111,6 +113,7 @@ def metas_to_ds(
     old_scale=None,
     mask_energy=True,
     oneway=False,
+    logger: logging.Logger = logging.getLogger(__name__),
 ):
     # Load energies
     meta_dicts1 = []
@@ -119,62 +122,76 @@ def metas_to_ds(
     energies2 = []
     pdbs1 = []
 
+    pickle_errors = []
     for meta_f in tqdm(meta_files, "Loading data", mininterval=2):
-        meta = np.load(meta_f, allow_pickle=True)
-        meta_d = np.expand_dims(meta[meta.files[0]], axis=0)[0]
+        try:
+            meta = np.load(meta_f, allow_pickle=True)
+            meta_d = np.expand_dims(meta[meta.files[0]], axis=0)[0]
 
-        m1 = meta_d.copy()
-        m2 = meta_d.copy()
-        m1["direction"] = 1
-        m2["direction"] = 2
-        meta_dicts1.append(m1)
-        meta_dicts2.append(m2)
-        name = meta_f.stem
-        if "#" in name:  # duplicated meta files w/o dup pdbs
-            name = name.rstrip("0123456789").rstrip("#")
-        assert (
-            "#" not in name
-        ), f"ERROR duplicating pdb from {name}\nold name: {meta_f.stem}"
+            m1 = meta_d.copy()
+            m2 = meta_d.copy()
+            m1["direction"] = 1
+            m2["direction"] = 2
+            meta_dicts1.append(m1)
+            meta_dicts2.append(m2)
+            name = meta_f.stem
+            if "#" in name:  # duplicated meta files w/o dup pdbs
+                name = name.rstrip("0123456789").rstrip("#")
+            assert (
+                "#" not in name
+            ), f"ERROR duplicating pdb from {name}\nold name: {meta_f.stem}"
 
-        pdbs1.append(
-            (
-                str(meta_f.parent / (name + "_1.pdb")),
-                str(meta_f.parent / (name + "_2.pdb")),
+            pdbs1.append(
+                (
+                    str(meta_f.parent / (name + "_1.pdb")),
+                    str(meta_f.parent / (name + "_2.pdb")),
+                )
             )
+
+            # filter translation
+            if max_dist is not None:
+                if meta_d["translation"] > max_dist:
+                    energies1.append(np.NaN)
+                    energies2.append(np.NaN)
+                    continue
+            if min_dist is not None:
+                if meta_d["translation"] < min_dist:
+                    energies1.append(np.NaN)
+                    energies2.append(np.NaN)
+                    continue
+
+            # read energies
+            if opt:
+                if "e_s_opt" in meta_d and "e_ts_opt" in meta_d:
+                    energies1.append(meta_d["e_ts_opt"] - meta_d["e_s_opt"])
+                else:
+                    energies1.append(np.NaN)
+                if "e_e_opt" in meta_d and "e_ts_opt" in meta_d:
+                    energies2.append(meta_d["e_ts_opt"] - meta_d["e_e_opt"])
+                else:
+                    energies2.append(np.NaN)
+
+            else:
+                if "e_max" in meta_d and "e_00" in meta_d:
+                    energies1.append(meta_d["e_max"] - meta_d["e_00"])
+                else:
+                    energies1.append(np.NaN)
+                if "e_10" in meta_d and "e_00" in meta_d:
+                    energies2.append(meta_d["e_max"] - meta_d["e_10"])
+                else:
+                    energies2.append(np.NaN)
+        except UnpicklingError:
+            pickle_errors.append(meta_f)
+            energies1.append(np.NaN)
+            energies2.append(np.NaN)
+
+    if len(pickle_errors) > 0:
+        logger.warning(
+            "Errors encountered during the loading of energies! "
+            f"{len(pickle_errors)} meta files could not be loaded."
         )
-
-        # filter translation
-        if max_dist is not None:
-            if meta_d["translation"] > max_dist:
-                energies1.append(np.NaN)
-                energies2.append(np.NaN)
-                continue
-        if min_dist is not None:
-            if meta_d["translation"] < min_dist:
-                energies1.append(np.NaN)
-                energies2.append(np.NaN)
-                continue
-
-        # read energies
-        if opt:
-            if "e_s_opt" in meta_d and "e_ts_opt" in meta_d:
-                energies1.append(meta_d["e_ts_opt"] - meta_d["e_s_opt"])
-            else:
-                energies1.append(np.NaN)
-            if "e_e_opt" in meta_d and "e_ts_opt" in meta_d:
-                energies2.append(meta_d["e_ts_opt"] - meta_d["e_e_opt"])
-            else:
-                energies2.append(np.NaN)
-
-        else:
-            if "e_max" in meta_d and "e_00" in meta_d:
-                energies1.append(meta_d["e_max"] - meta_d["e_00"])
-            else:
-                energies1.append(np.NaN)
-            if "e_10" in meta_d and "e_00" in meta_d:
-                energies2.append(meta_d["e_max"] - meta_d["e_10"])
-            else:
-                energies2.append(np.NaN)
+        if len(pickle_errors) < 50:
+            logger.error("\n".join(map(lambda p: str(p), pickle_errors)))
 
     if oneway:
         pdbs = np.array(pdbs1, dtype=str)
@@ -385,6 +402,7 @@ def create_meta_dataset_predictions(
     descriptors=None,
     mask_energy=True,
     oneway=False,
+    logger: logging.Logger = logging.getLogger(__name__),
 ):
     """Analogue to create_meta_dataset, but returns inputs and energies separate
 
@@ -432,6 +450,7 @@ def create_meta_dataset_predictions(
         old_scale=scale,
         mask_energy=mask_energy,
         oneway=oneway,
+        logger=logger,
     )
     in_ds = mk_mols_ds(pdbs)
 

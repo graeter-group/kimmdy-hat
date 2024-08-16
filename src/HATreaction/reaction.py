@@ -148,7 +148,7 @@ class HAT_reaction(ReactionPlugin):
                 unique=self.unique,
                 logger=logger,
             )
-            save_capped_systems(subsystems, se_dir)
+            save_capped_systems(subsystems, se_dir, logger=logger)
 
             # Build input features
             in_ds, es, scale_t, meta_ds, metas_masked = create_meta_dataset_predictions(
