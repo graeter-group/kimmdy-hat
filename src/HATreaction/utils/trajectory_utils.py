@@ -16,6 +16,8 @@ from HATreaction.utils.utils import check_cylinderclash
 from typing import Optional
 import numpy.typing as npt
 from pathlib import Path
+from tqdm.autonotebook import tqdm
+
 
 version = 0.9
 
@@ -861,7 +863,7 @@ def extract_subsystems(
     n_cut_systems = 0
     p = None
 
-    for ts in tqdm(u.trajectory[slice(start, stop, step)]):
+    for ts in tqdm(tqdm(u.trajectory[slice(start, stop, step)])):
         for i, (rad, bonded_rad) in enumerate(zip(rads, bonded_all)):
             # skip small distances
             skip = False
