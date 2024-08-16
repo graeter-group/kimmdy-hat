@@ -1,5 +1,6 @@
 from itertools import combinations
 import logging
+from tqdm.autonotebook import tqdm
 import MDAnalysis.coordinates.timestep
 from MDAnalysis.coordinates.XTC import XTCReader
 from MDAnalysis.analysis.distances import self_distance_array
@@ -848,7 +849,7 @@ def extract_subsystems(
 
     cut_systems = {}
 
-    for ts in u.trajectory[slice(start, stop, step)]:
+    for ts in tqdm(u.trajectory[slice(start, stop, step)]):
         for i, (rad, bonded_rad) in enumerate(zip(rads, bonded_all)):
             # skip small distances
             skip = False
