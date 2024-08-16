@@ -76,6 +76,7 @@ class HAT_reaction(ReactionPlugin):
         self.temperature = self.config.arrhenius_equation.temperature
         self.R = 1.9872159e-3  # [kcal K-1 mol-1]
         self.unique = self.config.unique
+        self.cap = self.config.cap
 
     def get_recipe_collection(self, files) -> RecipeCollection:
         from HATreaction.utils.input_generation import create_meta_dataset_predictions
@@ -143,7 +144,7 @@ class HAT_reaction(ReactionPlugin):
                 start=None,
                 stop=None,
                 step=self.polling_rate,
-                cap=False,
+                cap=self.cap,
                 rad_min_dist=3,
                 unique=self.unique,
                 logger=logger,
