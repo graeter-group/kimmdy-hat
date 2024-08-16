@@ -564,7 +564,8 @@ def extract_single_rad(
         as well as meta data
     """
     env = u.atoms.select_atoms(
-        f"point { str(rad.positions).strip('[ ]') } {env_cutoff}"
+        f"point { str(rad.positions).strip('[ ]') } {env_cutoff} and "
+        "(not resname SOL NA CL)"
     )
     end_poss = find_radical_pos(rad[0], bonded_rad)
     hs = []
@@ -653,7 +654,7 @@ def cap_single_rad(u, ts, rad, bonded_rad, h_cutoff=3, env_cutoff=15):
     # selecting in a smaller env is faster than in whole universe
     env = u.atoms.select_atoms(
         f"(point { str(rad.positions).strip('[ ]') } {env_cutoff}) and "
-        "(not resname SOL)"
+        "(not resname SOL NA CL)"
     )
     # ts2 = mda.transformations.unwrap(env)(ts)
     # env.unwrap()
@@ -920,31 +921,32 @@ def save_capped_systems(
     if not out_dir.exists():
         out_dir.mkdir(parents=True)
 
-        for system in systems:
-            system = system[1]  # 0 is translation
-            sys_hash = f'{system["meta"]["hash_u1"]}_{system["meta"]["hash_u2"]}'
+    for system in systems:
+        system = system[1]  # 0 is translation
+        sys_hash = f'{system["meta"]["hash_u1"]}_{system["meta"]["hash_u2"]}'
 
-            if (out_dir / f"{sys_hash}.npz").exists():
-                # print(f"ERROR: {sys_hash} hash exists!")
-                continue
+        if (out_dir / f"{sys_hash}.npz").exists():
+            # print(f"ERROR: {sys_hash} hash exists!")
+            continue
 
-            system["start_u"].atoms.write(out_dir / f"{sys_hash}_1.pdb")
-            system["end_u"].atoms.write(out_dir / f"{sys_hash}_2.pdb")
+        system["start_u"].atoms.write(out_dir / f"{sys_hash}_1.pdb")
+        system["end_u"].atoms.write(out_dir / f"{sys_hash}_2.pdb")
 
-            system["meta"]["meta_path"] = out_dir / f"{sys_hash}.npz"
+        system["meta"]["meta_path"] = out_dir / f"{sys_hash}.npz"
 
-            if frame is not None:
-                system["meta"]["frame"] = frame
+        if frame is not None:
+            system["meta"]["frame"] = frame
 
-            for i in range(10):
-                try:
-                    np.savez(out_dir / f"{sys_hash}.npz", system["meta"])
-                except OSError as e:
-                    logger.exception(e)
-                    logger.warning(f"{i+1}th retry to save {f'{sys_hash}.npz'}")
-                    time.sleep(1)
-            return
-    raise OSError("Input/output error")
+        for i in range(10):
+            try:
+                np.savez(out_dir / f"{sys_hash}.npz", system["meta"])
+                break
+            except OSError as e:
+                logger.exception(e)
+                logger.warning(f"{i+1}th retry to save {f'{sys_hash}.npz'}")
+                time.sleep(1)
+        else:
+            raise OSError("Input/output error")
 
 
 def make_radicals(

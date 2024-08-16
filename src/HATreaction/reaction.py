@@ -116,7 +116,7 @@ class HAT_reaction(ReactionPlugin):
         try:
             # environment around radical is updated by ts incrementation
             logger.info("Searching trajectory for radical structures.")
-            u_sub = MDA.Merge(sub_atms)
+            # u_sub = MDA.Merge(sub_atms)
             # u_sub.trajectory[0].dimensions = ts.dimensions
             # for ts in tqdm(u.trajectory[:: self.polling_rate]):
 
@@ -136,7 +136,7 @@ class HAT_reaction(ReactionPlugin):
             #         view.center()
             #         view
             subsystems = extract_subsystems(
-                u_sub,
+                u,
                 rad_ids,
                 h_cutoff=self.h_cutoff,
                 env_cutoff=10,
@@ -157,6 +157,7 @@ class HAT_reaction(ReactionPlugin):
                 mask_energy=False,
                 oneway=True,
             )
+            assert len(in_ds) > 0, "Empty dataset!"
 
             # Make predictions
             logger.info("Making predictions.")
@@ -209,7 +210,7 @@ class HAT_reaction(ReactionPlugin):
                     ]
                 )
             else:
-                raise ValueError()
+                raise ValueError(f"Unknown prediction scheme: {self.prediction_scheme}")
 
             # Rate; RT=0.593 kcal/mol
             logger.info("Creating Recipes.")
@@ -234,8 +235,7 @@ class HAT_reaction(ReactionPlugin):
                     f2 = len(u.trajectory) - 1
                 t1 = u.trajectory[f1].time
                 t2 = u.trajectory[f2].time
-                old_bound = str(u_sub.select_atoms(f"bonded id {ids[0]}")[0].id)
-
+                old_bound = str(u.select_atoms(f"bonded id {ids[0]}")[0].id)
                 # get end position
                 pdb_e = meta_d["meta_path"].with_name(
                     meta_d["meta_path"].stem + "_2.pdb"
