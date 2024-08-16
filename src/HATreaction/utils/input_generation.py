@@ -10,10 +10,11 @@ from ase.io import read
 from pathlib import Path
 from tqdm.autonotebook import tqdm
 import pandas as pd
+import logging
 from pickle import UnpicklingError
 
 # KGCNN==2.1.0, tensorflow==2.10.0
-version = 0.5  # Also used in HATreaction pluginversion
+version = 0.6  # Also used in HATreaction pluginversion
 
 
 def _preproc_pdb(pdbs):
@@ -112,6 +113,7 @@ def metas_to_ds(
     old_scale=None,
     mask_energy=True,
     oneway=False,
+    logger: logging.Logger = logging.getLogger(__name__),
 ):
     # Load energies
     meta_dicts1 = []
@@ -120,6 +122,7 @@ def metas_to_ds(
     energies2 = []
     pdbs1 = []
 
+    pickle_errors = []
     for meta_f in tqdm(meta_files, "Loading data", mininterval=2):
         try:
             meta = np.load(meta_f, allow_pickle=True)
@@ -178,8 +181,17 @@ def metas_to_ds(
                 else:
                     energies2.append(np.NaN)
         except UnpicklingError:
+            pickle_errors.append(meta_f)
             energies1.append(np.NaN)
             energies2.append(np.NaN)
+
+    if len(pickle_errors) > 0:
+        logger.warning(
+            "Errors encountered during the loading of energies! "
+            f"{len(pickle_errors)} meta files could not be loaded."
+        )
+        if len(pickle_errors) < 50:
+            logger.error("\n".join(map(lambda p: str(p), pickle_errors)))
 
     if oneway:
         pdbs = np.array(pdbs1, dtype=str)
@@ -390,6 +402,7 @@ def create_meta_dataset_predictions(
     descriptors=None,
     mask_energy=True,
     oneway=False,
+    logger: logging.Logger = logging.getLogger(__name__),
 ):
     """Analogue to create_meta_dataset, but returns inputs and energies separate
 
@@ -437,6 +450,7 @@ def create_meta_dataset_predictions(
         old_scale=scale,
         mask_energy=mask_energy,
         oneway=oneway,
+        logger=logger,
     )
     in_ds = mk_mols_ds(pdbs)
 
