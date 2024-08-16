@@ -40,6 +40,12 @@
         "pytype": "bool",
         "default": false
       },
+      "cap": {
+        "type": "boolean",
+        "description": "If true, cap structures for prediction. Default False.",
+        "pytype": "bool",
+        "default": false
+      },
       "model": {
         "type": "string",
         "description": "Model name, optional. If not defined, will choose based on grappa usage in KIMMDY.",

@@ -30,6 +30,7 @@ class DummyRunmanager:
         self.config.reactions.Hat_reaction.kmc = "extrande"
         self.config.reactions.Hat_reaction.keep_structures = False
         self.config.reactions.Hat_reaction.unique = False
+        self.config.reactions.Hat_reaction.cap = False
         self.config.changer = DummyClass()
         self.config.changer.topology = DummyClass()
         self.config.changer.topology.parameterization = "grappa"
