@@ -292,15 +292,17 @@ def make_predictions(
     for meta_d, rate in tqdm(zip(meta_ds, rates)):
         ids = [str(i) for i in meta_d["indices"][0:2]]  # one-based as ids are written
 
-        f1 = meta_d["frame"]
-        f2 = meta_d["frame"] + polling_rate
-        if f2 >= len(u.trajectory):
-            f2 = len(u.trajectory) - 1
-        t1 = u.trajectory[f1].time
-        t2 = u.trajectory[f2].time
-        old_bound = str(u.select_atoms(f"bonded id {ids[0]}")[0].id)
-        # get end position
-        pdb_e = meta_d["meta_path"].with_name(meta_d["meta_path"].stem + "_2.pdb")
+                f1 = meta_d["frame"]
+                f2 = meta_d["frame"] + polling_rate
+                if f2 >= len(u.trajectory):
+                    f2 = len(u.trajectory) - 1
+                t1 = u.trajectory[f1].time
+                t2 = u.trajectory[f2].time
+                old_bound = str(u.atoms[int(ids[0]) - 1].bonded_atoms[0].id)
+                # get end position
+                pdb_e = meta_d["meta_path"].with_name(
+                    meta_d["meta_path"].stem + "_2.pdb"
+                )
 
         if change_coords == "place":
             with open(pdb_e) as f:
