@@ -87,8 +87,10 @@ class HAT_reaction(ReactionPlugin):
 
         logger = files.logger
         logger.debug("Getting recipe for reaction: HAT")
-        #TODO add gro support
-        for suff in ["tpr",]:
+        # TODO add gro support
+        for suff in [
+            "tpr",
+        ]:
             if self.runmng.latest_files.get(suff, None):
                 struc_p = str(files.input[suff])
                 break
