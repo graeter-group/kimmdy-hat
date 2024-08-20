@@ -74,8 +74,8 @@
       },
       "radicals": {
         "type": "integer",
-        "description": "Radical index, usually supplied through kimmdy, optional",
-        "pytype": "int",
+        "description": "Space-separated string of radical atom ids, can be empty, usually supplyed through kimmdy, optional",
+        "pytype": "str",
         "default": null
       },
       "change_coords": {

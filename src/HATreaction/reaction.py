@@ -87,13 +87,13 @@ class HAT_reaction(ReactionPlugin):
 
         logger = files.logger
         logger.debug("Getting recipe for reaction: HAT")
-
-        for suff in ["tpr", "gro"]:
+        #TODO add gro support
+        for suff in ["tpr",]:
             if self.runmng.latest_files.get(suff, None):
                 struc_p = str(files.input[suff])
                 break
         else:
-            raise FileNotFoundError("None of tpr, gro could be found!")
+            raise FileNotFoundError("tpr could not be found!")
 
         for suff in ["trr", "xtc"]:
             if self.runmng.latest_files.get(suff, None):
@@ -101,11 +101,12 @@ class HAT_reaction(ReactionPlugin):
                 break
         else:
             raise FileNotFoundError("None of trr, xtc could be found!")
-        
+
         u = MDA.Universe(struc_p, traj_p)
-        u.add_TopologyAttr("elements", u.atoms.types)  # for gro!
-        protein = u.select_atoms("not resname SOL Na Cl HO OH HW OW")
-        protein.guess_bonds()
+        # u.add_TopologyAttr("elements", u.atoms.types)  # for gro!
+
+        # protein = u.select_atoms("not resname SOL Na Cl HO OH HW OW")
+        # protein.guess_bonds()
 
         # Make ids unique. ids are persistent in subuniverses, indices not
         u.atoms.ids = u.atoms.indices + 1
@@ -117,23 +118,24 @@ class HAT_reaction(ReactionPlugin):
             se_dir = Path(se_tmpdir.name)
 
         if getattr(self.config, "radicals", None) is not None:
-            rad_ids = self.config.radicals
+            rad_ids = [int(r) for r in (self.config.radicals).split()]
+            logger.debug(f"Radicals read from reaction config: {rad_ids}")
         else:
             # One-based strings in top
             rad_ids = list(self.runmng.top.radicals.keys())
         if len(rad_ids) < 1:
             logger.debug("No radicals known, searching in structure..")
             rad_ids = [str(a[0].id) for a in find_radicals(u)]
-        logger.info(f"Found radicals: {len(rad_ids)}")
+        logger.info(f"Found {len(rad_ids)} radicals")
         if len(rad_ids) < 1:
             logger.info("--> retuning empty recipe collection")
             return RecipeCollection([])
         rad_ids = sorted(rad_ids)
-        sub_atms = u.select_atoms(
-            f"((not resname SOL NA CL) and (around 20 id {' '.join([i for i in rad_ids])}))"
-            f" or id {' '.join([i for i in rad_ids])}",
-            updating=True,
-        )
+        # sub_atms = u.select_atoms(
+        #     f"((not resname SOL NA CL) and (around 20 id {' '.join([i for i in rad_ids])}))"
+        #     f" or id {' '.join([i for i in rad_ids])}",
+        #     updating=True,
+        # )
         try:
             # environment around radical is updated by ts incrementation
             logger.info("Searching trajectory for radical structures.")
@@ -156,7 +158,7 @@ class HAT_reaction(ReactionPlugin):
             #         view._set_selection("@" + ",".join(rad_ids), repr_index=1)
             #         view.center()
             #         view
-            subsystems = extract_subsystems(
+            extract_subsystems(
                 u,
                 rad_ids,
                 h_cutoff=self.h_cutoff,
@@ -167,9 +169,9 @@ class HAT_reaction(ReactionPlugin):
                 cap=self.cap,
                 rad_min_dist=3,
                 unique=self.unique,
+                out_dir=se_dir,
                 logger=logger,
             )
-            save_capped_systems(subsystems, se_dir, logger=logger)
 
             # Build input features
             in_ds, es, scale_t, meta_ds, metas_masked = create_meta_dataset_predictions(

@@ -36,6 +36,10 @@ class DummyRunmanager:
         self.config.changer.topology.parameterization = "grappa"
         self.top = DummyClass()
         self.top.radicals = {}
+        self.latest_files = {
+            "tpr": Path(__file__).parent / "test_traj_io" / "equilibrium1.tpr",
+            "trr": Path(__file__).parent / "test_traj_io" / "equilibrium1.trr",
+        }
 
 
 @pytest.fixture
