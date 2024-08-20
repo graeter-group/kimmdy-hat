@@ -301,6 +301,7 @@ def make_predictions(
         old_bound = str(u.select_atoms(f"bonded id {ids[0]}")[0].id)
         # get end position
         pdb_e = meta_d["meta_path"].with_name(meta_d["meta_path"].stem + "_2.pdb")
+
         if change_coords == "place":
             with open(pdb_e) as f:
                 finished = False
