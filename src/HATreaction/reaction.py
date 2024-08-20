@@ -81,16 +81,14 @@ class HAT_reaction(ReactionPlugin):
         self.R = 1.9872159e-3  # [kcal K-1 mol-1]
         self.unique = self.config.unique
         self.cap = self.config.cap
+        self.change_coords = self.config.change_coords
 
     def get_recipe_collection(self, files) -> RecipeCollection:
-        from HATreaction.utils.input_generation import create_meta_dataset_predictions
 
         logger = files.logger
         logger.debug("Getting recipe for reaction: HAT")
         # TODO add gro support
-        for suff in [
-            "tpr",
-        ]:
+        for suff in ["tpr"]:
             if self.runmng.latest_files.get(suff, None):
                 struc_p = str(files.input[suff])
                 break
@@ -175,129 +173,23 @@ class HAT_reaction(ReactionPlugin):
                 logger=logger,
             )
 
-            # Build input features
-            in_ds, es, scale_t, meta_ds, metas_masked = create_meta_dataset_predictions(
-                meta_files=list(se_dir.glob("*.npz")),
-                batch_size=self.hparas["batchsize"],
-                mask_energy=False,
-                oneway=True,
-            )
-            assert len(in_ds) > 0, "Empty dataset!"
+            kwargs = {
+                "se_dir": se_dir,
+                "hparas": self.hparas,
+                "prediction_scheme": self.prediction_scheme,
+                "models": self.models,
+                "means": self.means,
+                "stds": self.stds,
+                "R": self.R,
+                "temperature": self.temperature,
+                "polling_rate": self.polling_rate,
+                "change_coords": self.change_coords,
+                "frequency_factor": self.frequency_factor,
+                "logger": logger,
+            }
 
-            # Make predictions
-            logger.info("Making predictions.")
-            if self.prediction_scheme == "all_models":
-                ys = []
-                for model, m, s in zip(self.models, self.means, self.stds):
-                    y = model.predict(in_ds).reshape(-1)
-                    ys.append((y * s) + m)
-                ys = np.stack(ys)
-                ys = np.mean(np.array(ys), 0)
-            elif self.prediction_scheme == "efficient":
-                # hyperparameters
-                # offset to lowest barrier, 11RT offset means, the rates
-                # are less than one millionth of the highest rate
-                required_offset = 11 / (self.R * self.temperature)
-                uncertainty = (
-                    3.5  # kcal/mol; expected error to QM of a single model prediction
-                )
-                # single prediction
-                model, m, s = next(zip(self.models, self.means, self.stds))
-                ys_single = model.predict(in_ds).reshape(-1)
-                # find where to recalculate with full ensemble (low barriers)
-                recalculate = ys_single <= (
-                    ys_single.min() + required_offset + uncertainty
-                )
-                # build reduced dataset
-                meta_files_recalculate = [
-                    s for s, r in zip(list(se_dir.glob("*.npz")), recalculate) if r
-                ]
-                in_ds_ensemble, _, _, _, _ = create_meta_dataset_predictions(
-                    meta_files=meta_files_recalculate,
-                    batch_size=self.hparas["batchsize"],
-                    mask_energy=False,
-                    oneway=True,
-                )
-                # ensemble prediction
-                ys_ensemble = []
-                for model, m, s in zip(self.models, self.means, self.stds):
-                    y_ensemble = model.predict(in_ds_ensemble).reshape(-1)
-                    ys_ensemble.append((y_ensemble * s) + m)
-                ys_ensemble = np.stack(ys_ensemble)
-                ys_ensemble = np.mean(np.array(ys_ensemble), 0)
-                ys_full_iter = iter(ys_ensemble)
-                # take ensemble prediction value where there was a recaulcation,
-                # else y_single
-                ys = np.asarray(
-                    [
-                        y_single if not r else next(ys_full_iter)
-                        for y_single, r in zip(ys_single, recalculate)
-                    ]
-                )
-            else:
-                raise ValueError(f"Unknown prediction scheme: {self.prediction_scheme}")
+            recipe_collection = make_predictions(u, **kwargs)
 
-            # Rate; RT=0.593 kcal/mol
-            logger.info("Creating Recipes.")
-            rates = list(
-                np.multiply(
-                    self.frequency_factor,
-                    np.float_power(np.e, (-ys / (self.temperature * self.R))),
-                )
-            )
-            recipes = []
-            logger.debug(f"Barriers:\n{pformat(ys)}")
-            logger.info(f"Max Rate: {max(rates)}, predicted {len(rates)} rates")
-            logger.debug(f"Rates:\n{pformat(rates)}")
-            for meta_d, rate in zip(meta_ds, rates):
-                ids = [
-                    str(i) for i in meta_d["indices"][0:2]
-                ]  # one-based as ids are written
-
-                f1 = meta_d["frame"]
-                f2 = meta_d["frame"] + self.polling_rate
-                if f2 >= len(u.trajectory):
-                    f2 = len(u.trajectory) - 1
-                t1 = u.trajectory[f1].time
-                t2 = u.trajectory[f2].time
-                old_bound = str(u.select_atoms(f"bonded id {ids[0]}")[0].id)
-                # get end position
-                pdb_e = meta_d["meta_path"].with_name(
-                    meta_d["meta_path"].stem + "_2.pdb"
-                )
-                with open(pdb_e) as f:
-                    finished = False
-                    while not finished:
-                        line = f.readline()
-                        if line[:11] == "ATOM      1":
-                            finished = True
-                            x = float(line[30:38].strip())
-                            y = float(line[38:46].strip())
-                            z = float(line[46:54].strip())
-                if self.config.change_coords == "place":
-                    # HAT plugin ids are kimmdy ixs (zero-based,int)
-                    seq = [
-                        Break(atom_id_1=old_bound, atom_id_2=ids[0]),
-                        Place(id_to_place=ids[0], new_coords=[x, y, z]),
-                        Bind(atom_id_1=ids[0], atom_id_2=ids[1]),
-                    ]
-                elif self.config.change_coords == "lambda":
-                    seq = [
-                        Break(atom_id_1=old_bound, atom_id_2=ids[0]),
-                        Bind(atom_id_1=ids[0], atom_id_2=ids[1]),
-                        Relax(),
-                    ]
-                else:
-                    raise ValueError(
-                        f"Unknown change_coords parameter {self.config.change_coords}"
-                    )
-
-                # make recipe
-                recipes.append(
-                    Recipe(recipe_steps=seq, rates=[rate], timespans=[[t1, t2]])
-                )
-
-            recipe_collection = RecipeCollection(recipes)
         except Exception as e:
             # backup in case of failure
             if not self.config.keep_structures:
@@ -306,4 +198,135 @@ class HAT_reaction(ReactionPlugin):
 
         if not self.config.keep_structures:
             se_tmpdir.cleanup()
+
         return recipe_collection
+
+
+def make_predictions(
+    u: MDA.Universe,
+    se_dir,
+    hparas,
+    prediction_scheme,
+    models,
+    means,
+    stds,
+    R,
+    temperature,
+    polling_rate,
+    change_coords,
+    frequency_factor,
+    logger: logging.Logger = logging.getLogger(__name__),
+):
+    from HATreaction.utils.input_generation import create_meta_dataset_predictions
+
+    # Build input features
+    in_ds, es, scale_t, meta_ds, metas_masked = create_meta_dataset_predictions(
+        meta_files=list(se_dir.glob("*.npz")),
+        batch_size=hparas["batchsize"],
+        mask_energy=False,
+        oneway=True,
+    )
+    assert len(in_ds) > 0, "Empty dataset!"
+
+    # Make predictions
+    logger.info("Making predictions.")
+    if prediction_scheme == "all_models":
+        ys = []
+        for model, m, s in zip(models, means, stds):
+            y = model.predict(in_ds).reshape(-1)
+            ys.append((y * s) + m)
+        ys = np.stack(ys)
+        ys = np.mean(np.array(ys), 0)
+    elif prediction_scheme == "efficient":
+        # hyperparameters
+        # offset to lowest barrier, 11RT offset means, the rates
+        # are less than one millionth of the highest rate
+        required_offset = 11 / (R * temperature)
+        uncertainty = 3.5  # kcal/mol; expected error to QM of a single model prediction
+        # single prediction
+        model, m, s = next(zip(models, means, stds))
+        ys_single = model.predict(in_ds).reshape(-1)
+        # find where to recalculate with full ensemble (low barriers)
+        recalculate = ys_single <= (ys_single.min() + required_offset + uncertainty)
+        # build reduced dataset
+        meta_files_recalculate = [
+            s for s, r in zip(list(se_dir.glob("*.npz")), recalculate) if r
+        ]
+        in_ds_ensemble, _, _, _, _ = create_meta_dataset_predictions(
+            meta_files=meta_files_recalculate,
+            batch_size=hparas["batchsize"],
+            mask_energy=False,
+            oneway=True,
+        )
+        # ensemble prediction
+        ys_ensemble = []
+        for model, m, s in zip(models, means, stds):
+            y_ensemble = model.predict(in_ds_ensemble).reshape(-1)
+            ys_ensemble.append((y_ensemble * s) + m)
+        ys_ensemble = np.stack(ys_ensemble)
+        ys_ensemble = np.mean(np.array(ys_ensemble), 0)
+        ys_full_iter = iter(ys_ensemble)
+        # take ensemble prediction value where there was a recaulcation,
+        # else y_single
+        ys = np.asarray(
+            [
+                y_single if not r else next(ys_full_iter)
+                for y_single, r in zip(ys_single, recalculate)
+            ]
+        )
+    else:
+        raise ValueError(f"Unknown prediction scheme: {prediction_scheme}")
+
+    # Rate; RT=0.593 kcal/mol
+    logger.info("Creating Recipes.")
+    rates = list(
+        np.multiply(
+            frequency_factor,
+            np.float_power(np.e, (-ys / (temperature * R))),
+        )
+    )
+    recipes = []
+    logger.debug(f"Barriers:\n{pformat(ys)}")
+    logger.info(f"Max Rate: {max(rates)}, predicted {len(rates)} rates")
+    logger.debug(f"Rates:\n{pformat(rates)}")
+    for meta_d, rate in zip(meta_ds, rates):
+        ids = [str(i) for i in meta_d["indices"][0:2]]  # one-based as ids are written
+
+        f1 = meta_d["frame"]
+        f2 = meta_d["frame"] + polling_rate
+        if f2 >= len(u.trajectory):
+            f2 = len(u.trajectory) - 1
+        t1 = u.trajectory[f1].time
+        t2 = u.trajectory[f2].time
+        old_bound = str(u.select_atoms(f"bonded id {ids[0]}")[0].id)
+        # get end position
+        pdb_e = meta_d["meta_path"].with_name(meta_d["meta_path"].stem + "_2.pdb")
+        with open(pdb_e) as f:
+            finished = False
+            while not finished:
+                line = f.readline()
+                if line[:11] == "ATOM      1":
+                    finished = True
+                    x = float(line[30:38].strip())
+                    y = float(line[38:46].strip())
+                    z = float(line[46:54].strip())
+        if change_coords == "place":
+            # HAT plugin ids are kimmdy ixs (zero-based,int)
+            seq = [
+                Break(atom_id_1=old_bound, atom_id_2=ids[0]),
+                Place(id_to_place=ids[0], new_coords=[x, y, z]),
+                Bind(atom_id_1=ids[0], atom_id_2=ids[1]),
+            ]
+        elif change_coords == "lambda":
+            seq = [
+                Break(atom_id_1=old_bound, atom_id_2=ids[0]),
+                Bind(atom_id_1=ids[0], atom_id_2=ids[1]),
+                Relax(),
+            ]
+        else:
+            raise ValueError(f"Unknown change_coords parameter {change_coords}")
+
+        # make recipe
+        recipes.append(Recipe(recipe_steps=seq, rates=[rate], timespans=[[t1, t2]]))
+
+    return RecipeCollection(recipes)
