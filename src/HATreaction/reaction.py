@@ -88,9 +88,25 @@ class HAT_reaction(ReactionPlugin):
         logger = files.logger
         logger.debug("Getting recipe for reaction: HAT")
 
-        tpr = str(files.input["tpr"])
-        trr = str(files.input["trr"])
-        u = MDA.Universe(str(tpr), str(trr))
+        for suff in ["tpr", "gro"]:
+            if self.runmng.latest_files.get(suff, None):
+                struc_p = str(files.input[suff])
+                break
+        else:
+            raise FileNotFoundError("None of tpr, gro could be found!")
+
+        for suff in ["trr", "xtc"]:
+            if self.runmng.latest_files.get(suff, None):
+                traj_p = str(files.input[suff])
+                break
+        else:
+            raise FileNotFoundError("None of trr, xtc could be found!")
+        
+        u = MDA.Universe(struc_p, traj_p)
+        u.add_TopologyAttr("elements", u.atoms.types)  # for gro!
+        protein = u.select_atoms("not resname SOL Na Cl HO OH HW OW")
+        protein.guess_bonds()
+
         # Make ids unique. ids are persistent in subuniverses, indices not
         u.atoms.ids = u.atoms.indices + 1
 
