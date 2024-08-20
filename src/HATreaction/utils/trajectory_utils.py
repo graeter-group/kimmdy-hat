@@ -16,11 +16,7 @@ from HATreaction.utils.utils import check_cylinderclash
 from typing import Optional
 import numpy.typing as npt
 from pathlib import Path
-<<<<<<< HEAD
 from tqdm.autonotebook import tqdm
-
-=======
->>>>>>> bb3c1eb (remove whitespace)
 
 version = 0.9
 
