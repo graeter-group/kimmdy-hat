@@ -822,9 +822,11 @@ def extract_subsystems(
 
     assert len(rad_ids) > 0, "Error: At least one radical must be given!"
     if out_dir:
-        logger.debug("Periodic saving is turned on.")
+        logger.debug("Saving structures is turned on.")
     if unique:
         logger.debug("Only saving the smallest distance of each reaction.")
+    else:
+        logger.debug("Saving all structures of all reactions.")
 
     rads: list[mda.AtomGroup] = [u.select_atoms(f"id {rad}") for rad in rad_ids]
 

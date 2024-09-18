@@ -404,7 +404,9 @@ def create_meta_dataset_predictions(
     oneway=False,
     logger: logging.Logger = logging.getLogger(__name__),
 ):
-    """Analogue to create_meta_dataset, but returns inputs and energies separate
+    """Analogue to create_meta_dataset, but returns inputs and energies separate.
+    Returned dataset is not shuffled.
+
 
     Parameters
     ----------

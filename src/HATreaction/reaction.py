@@ -123,6 +123,7 @@ class HAT_reaction(ReactionPlugin):
         else:
             # One-based strings in top
             rad_ids = list(self.runmng.top.radicals.keys())
+            logger.debug(f"Radicals obtained from runmanager: {rad_ids}")
         if len(rad_ids) < 1:
             logger.debug("No radicals known, searching in structure..")
             rad_ids = [str(a[0].id) for a in find_radicals(u)]
@@ -130,6 +131,7 @@ class HAT_reaction(ReactionPlugin):
         if len(rad_ids) < 1:
             logger.info("--> retuning empty recipe collection")
             return RecipeCollection([])
+
         rad_ids = sorted(rad_ids)
         # sub_atms = u.select_atoms(
         #     f"((not resname SOL NA CL) and (around 20 id {' '.join([i for i in rad_ids])}))"
@@ -138,7 +140,7 @@ class HAT_reaction(ReactionPlugin):
         # )
         try:
             # environment around radical is updated by ts incrementation
-            logger.info("Searching trajectory for radical structures.")
+            logger.info("Extracting radical structures from trajectory.")
             # u_sub = MDA.Merge(sub_atms)
             # u_sub.trajectory[0].dimensions = ts.dimensions
             # for ts in tqdm(u.trajectory[:: self.polling_rate]):
@@ -185,6 +187,7 @@ class HAT_reaction(ReactionPlugin):
                 "polling_rate": self.polling_rate,
                 "change_coords": self.change_coords,
                 "frequency_factor": self.frequency_factor,
+                "files": files,
                 "logger": logger,
             }
 
@@ -215,13 +218,15 @@ def make_predictions(
     polling_rate,
     change_coords,
     frequency_factor,
+    files,
     logger: logging.Logger = logging.getLogger(__name__),
 ):
     from HATreaction.utils.input_generation import create_meta_dataset_predictions
 
     # Build input features
+    se_npzs = list(se_dir.glob("*.npz"))
     in_ds, es, scale_t, meta_ds, metas_masked = create_meta_dataset_predictions(
-        meta_files=list(se_dir.glob("*.npz")),
+        meta_files=se_npzs,
         batch_size=hparas["batchsize"],
         mask_energy=False,
         oneway=True,
@@ -286,9 +291,13 @@ def make_predictions(
         )
     )
     recipes = []
-    logger.debug(f"Barriers:\n{pformat(ys)}")
+
+    with open(files.outputdir / "predictions.csv", "x") as f:
+        f.write(" ".join(("npz", "barrier", "rate", "\n")))
+        for npz, y, r in zip(se_npzs, ys, rates):
+            f.write(" ".join((npz.name, str(y), str(r), "\n")))
+
     logger.info(f"Max Rate: {max(rates)}, predicted {len(rates)} rates")
-    logger.debug(f"Rates:\n{pformat(rates)}")
     for meta_d, rate in tqdm(zip(meta_ds, rates)):
         ids = [str(i) for i in meta_d["indices"][0:2]]  # one-based as ids are written
 

@@ -6,6 +6,10 @@ existing pdb+meta files.
 # %%
 from pathlib import Path
 import json
+import shutil
+import numpy as np
+from tqdm.autonotebook import tqdm
+from collections import defaultdict
 from importlib.resources import files as res_files
 
 from HATreaction.reaction import make_predictions
@@ -17,7 +21,7 @@ load_model = tf.keras.models.load_model
 
 # %% ----- Paths & Variables -----
 root = Path("/hits/fast/mbm/riedmiki/kimmdy_runs/hat_correlation_lysozyme/kimmdy/")
-se_dir = root / "lysozyme_stride_1000" / "1_hat_reaction" / "se"
+se_dir = root / "lysozyme_stride_1000" / "1_hat_reaction" / "se_unique"
 structure = root / "protein.pdb"
 trajectory = root / "prod.xtc"
 
@@ -87,8 +91,62 @@ recipe_collection = make_predictions(
 # %% ----- Saving recipes -----
 recipe_collection.to_csv(
     Path(
-        "/hits/fast/mbm/riedmiki/kimmdy_runs/hat_correlation_lysozyme/kimmdy/lysozyme_stride_1000/1_hat_reaction/recipes.csv"
+        "/hits/fast/mbm/riedmiki/kimmdy_runs/hat_correlation_lysozyme/kimmdy/lysozyme_stride_1000/1_hat_reaction/recipes_unique.csv"
     )
 )
 
-# %% -----  -----
+# %% ----- build se dir with unique reactions -----
+
+
+def get_coords_from_pdb(pdb: Path):
+    with open(pdb) as f:
+        finished = False
+        while not finished:
+            line = f.readline()
+            if line[:11] == "ATOM      1":
+                finished = True
+                x = float(line[30:38].strip())
+                y = float(line[38:46].strip())
+                z = float(line[46:54].strip())
+    return np.array((x, y, z))
+
+
+se_dir = Path(
+    "/hits/fast/mbm/riedmiki/kimmdy_runs/hat_correlation_lysozyme/kimmdy"
+    "/lysozyme_stride_2/1_hat_reaction/se"
+)
+
+uniques = defaultdict(lambda: (100, None))
+
+for meta_p in tqdm(se_dir.glob("*.npz")):
+    meta = np.load(meta_p, allow_pickle=True)
+    meta_d = np.expand_dims(meta[meta.files[0]], axis=0)[0]
+
+    ident = meta_d["indices"][:2]
+    trans = meta_d["translation"]
+
+    if trans < uniques[ident][0]:
+        uniques[ident] = (trans, meta_p.stem)
+
+se_unique_dir = se_dir.with_name("se_unique")
+se_unique_dir.mkdir(exist_ok=True)
+
+for v in tqdm(uniques.values()):
+    h = v[1]
+    if v[0] > 10:
+        continue
+    for p in se_dir.glob(h + "*"):
+        if not (se_unique_dir / p.name).exists():
+            (se_unique_dir / p.name).symlink_to(p)
+
+
+
+
+
+
+
+
+
+
+
+# %%
