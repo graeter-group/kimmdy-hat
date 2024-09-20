@@ -170,7 +170,7 @@ class HAT_reaction(ReactionPlugin):
                 step=self.polling_rate,
                 cap=self.cap,
                 rad_min_dist=3,
-                unique=self.unique,
+                # unique=self.unique,
                 out_dir=se_dir,
                 logger=logger,
             )
