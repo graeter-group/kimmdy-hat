@@ -775,7 +775,7 @@ def extract_subsystems(
     stop: Optional[int] = None,
     step: Optional[int] = None,
     rad_min_dist: float = 3,
-    n_unique: int = 2,
+    n_unique: int = 50,
     cap: bool = True,
     out_dir: Optional[Path] = None,
     logger: logging.Logger = logging.getLogger(__name__),
@@ -805,7 +805,7 @@ def extract_subsystems(
     step
         For slicing the trajectory, by default None
     n_unique
-        Number of smallest systems per reaction to save
+        Number of smallest systems per reaction to save. Set to 0 to consider all.
     cap
         Whether or not the subsystems should be capped. If false, subsystems are
         created by cutting out a sphere with radius env_cutoff. Optional, default: True
@@ -824,7 +824,7 @@ def extract_subsystems(
     assert len(rad_ids) > 0, "Error: At least one radical must be given!"
     if out_dir:
         logger.debug("Saving structures is turned on.")
-    if n_unique:
+    if n_unique > 0:
         logger.debug(f"Saving the {n_unique} smallest distance(s) of each reaction.")
     else:
         logger.debug("Saving all structures of all reactions.")
@@ -891,29 +891,30 @@ def extract_subsystems(
                 )
 
             for i, cut_sys_dict in enumerate(cut_frame):
-
                 # only h and rad index
                 new_i_hash = hash(cut_sys_dict["meta"]["indices"][:2])
 
                 # space left in top list:
-                if len(translations_d[new_i_hash]) < n_unique:
-                    translations_d[new_i_hash][len(translations_d[new_i_hash])] = cut_sys_dict[
-                        "meta"
-                    ]["translation"]
-                    cut_systems[new_i_hash][len(translations_d[new_i_hash])] = (
+                if (n_unique < 1) or (len(translations_d[new_i_hash]) < n_unique):
+                    safe_slot = len(translations_d[new_i_hash])
+                    translations_d[new_i_hash][safe_slot] = cut_sys_dict["meta"][
+                        "translation"
+                    ]
+                    cut_systems[new_i_hash][safe_slot] = (
                         cut_sys_dict["meta"]["translation"],
                         cut_sys_dict,
                         False,  # overwrite
-                        # [len(translations_d[new_i_hash])]
                     )
                     n_cut_systems += 1
 
                 # not closer than top smallest distances:
-                elif cut_sys_dict["meta"]["translation"] >= max(translations_d[new_i_hash].values()):
+                elif cut_sys_dict["meta"]["translation"] >= max(
+                    translations_d[new_i_hash].values()
+                ):
                     logger.debug("Skipping due to translation")
                     logger.debug(
-                        cut_sys_dict["meta"]["translation"],
-                        translations_d[new_i_hash],
+                        f"{cut_sys_dict['meta']['translation']} < "
+                        f"{max(translations_d[new_i_hash].values())}"
                     )
                     continue
 
@@ -925,12 +926,13 @@ def extract_subsystems(
                     max_key = keys[dists.index(max(dists))]
 
                     # overwrite longest distance
-                    translations_d[new_i_hash][max_key] = cut_sys_dict["meta"]["translation"]
+                    translations_d[new_i_hash][max_key] = cut_sys_dict["meta"][
+                        "translation"
+                    ]
                     cut_systems[new_i_hash][max_key] = (
                         cut_sys_dict["meta"]["translation"],
                         cut_sys_dict,
                         True,  # Overwrite
-                        # max_key,  # safe slot
                     )
 
         # saving periodically
@@ -988,10 +990,12 @@ def save_capped_systems(
     for new_i_hash, vi in systems.items():
         for max_key, system in vi.items():
             sys_d = system[1]  # 0 is translation
-            sys_hash = f'{new_i_hash}_{max_key}'
+            sys_hash = f"{new_i_hash}_{max_key}"
 
-            if (out_dir / f"{sys_hash}.npz").exists() and not system[2]:
-                continue
+            if (out_dir / f"{sys_hash}.npz").exists():
+                if not system[2]:
+                    logger.warning(f"{sys_hash}.npz exists, but overwrite is False!")
+                    continue
 
             sys_d["start_u"].atoms.write(out_dir / f"{sys_hash}_1.pdb")
             sys_d["end_u"].atoms.write(out_dir / f"{sys_hash}_2.pdb")

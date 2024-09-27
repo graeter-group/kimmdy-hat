@@ -79,9 +79,9 @@ class HAT_reaction(ReactionPlugin):
         self.frequency_factor = self.config.arrhenius_equation.frequency_factor
         self.temperature = self.config.arrhenius_equation.temperature
         self.R = 1.9872159e-3  # [kcal K-1 mol-1]
-        self.unique = self.config.unique
         self.cap = self.config.cap
         self.change_coords = self.config.change_coords
+        self.n_unique = self.config.n_unique
 
     def get_recipe_collection(self, files) -> RecipeCollection:
 
@@ -170,7 +170,7 @@ class HAT_reaction(ReactionPlugin):
                 step=self.polling_rate,
                 cap=self.cap,
                 rad_min_dist=3,
-                # unique=self.unique,
+                n_unique=self.n_unique,
                 out_dir=se_dir,
                 logger=logger,
             )

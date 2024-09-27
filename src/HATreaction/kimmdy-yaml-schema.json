@@ -34,12 +34,6 @@
         "pytype": "float",
         "default": 3
       },
-      "unique": {
-        "type": "boolean",
-        "description": "If true, only check barrier for smallest distance for one set of reacting atoms. Default False.",
-        "pytype": "bool",
-        "default": false
-      },
       "cap": {
         "type": "boolean",
         "description": "If true, cap structures for prediction. Default False.",
@@ -71,6 +65,12 @@
         "description": "Polling rate, defaults to 10",
         "pytype": "int",
         "default": 10
+      },
+      "n_unique": {
+        "type": "integer",
+        "description": "Only consider the n frames per reaction with the smallest translation distances. Set to 0 to consider all, defaults to 50",
+        "pytype": "int",
+        "default": 50
       },
       "radicals": {
         "type": "integer",
