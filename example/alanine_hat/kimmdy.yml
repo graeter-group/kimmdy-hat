@@ -24,6 +24,7 @@ reactions:
     polling_rate: 1
     change_coords: 'place'
     keep_structures: true
+    n_unique: 10
 plot_rates: true
 
 sequence:

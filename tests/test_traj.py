@@ -29,8 +29,8 @@ class DummyRunmanager:
         self.config.reactions.Hat_reaction.change_coords = "place"
         self.config.reactions.Hat_reaction.kmc = "extrande"
         self.config.reactions.Hat_reaction.keep_structures = False
-        self.config.reactions.Hat_reaction.unique = False
         self.config.reactions.Hat_reaction.cap = False
+        self.config.reactions.Hat_reaction.n_unique = 0
         self.config.changer = DummyClass()
         self.config.changer.topology = DummyClass()
         self.config.changer.topology.parameterization = "grappa"
@@ -59,7 +59,7 @@ def recipe_collection(tmpdir):
 @pytest.fixture
 def recipe_collection_unique(tmpdir):
     rmg_unique = DummyRunmanager()
-    rmg_unique.config.reactions.Hat_reaction.unique = True
+    rmg_unique.config.reactions.Hat_reaction.n_unique = 1
     plgn = HAT_reaction("Hat_reaction", rmg_unique)
 
     files = DummyClass()
@@ -72,6 +72,23 @@ def recipe_collection_unique(tmpdir):
     return plgn.get_recipe_collection(files)
 
 
+@pytest.fixture
+def recipe_collection_n_unique(tmpdir):
+    rmg_unique = DummyRunmanager()
+    rmg_unique.config.reactions.Hat_reaction.n_unique = 2
+    rmg_unique.config.reactions.Hat_reaction.keep_structures = True
+    plgn = HAT_reaction("Hat_reaction", rmg_unique)
+
+    files = DummyClass()
+    files.input = {
+        "tpr": Path(__file__).parent / "test_traj_io" / "equilibrium1.tpr",
+        "trr": Path(__file__).parent / "test_traj_io" / "equilibrium1.trr",
+    }
+    files.outputdir = Path(tmpdir)
+
+    return plgn.get_recipe_collection(files), files
+
+
 def test_traj_unique(recipe_collection_unique):
     print(recipe_collection_unique.recipes)
     assert len(recipe_collection_unique.recipes) == 5
@@ -82,6 +99,23 @@ def test_traj_unique(recipe_collection_unique):
     l = [r.recipe_steps[0] for r in recipe_collection_unique.recipes]
     s = {r.recipe_steps[0] for r in recipe_collection_unique.recipes}
     assert all([r in s for r in l])
+
+
+def test_traj_n_unique_files(recipe_collection_n_unique):
+    recipe_collection, files = recipe_collection_n_unique
+    print(recipe_collection.recipes)
+    assert len(recipe_collection.recipes) == 10
+
+    f_list = [p for p in files.outputdir.glob("se/*_0_*.pdb")]
+    f_list_all = [p for p in files.outputdir.glob("se/*.pdb")]
+    for f in f_list:
+        f_list_all.remove(f)
+        parts = f.name.split("_")
+        other = f.with_name(f"{parts[0]}_1_{parts[2]}")
+        assert other.exists()
+        f_list_all.remove(other)
+
+    assert len(f_list_all) == 0
 
 
 def test_traj_to_recipes(recipe_collection):
