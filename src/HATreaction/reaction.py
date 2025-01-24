@@ -322,7 +322,7 @@ def make_predictions(
         # get id of heavy atom bound to HAT hydrogen before reaction
         h_id = int(ids[0]) - 1
         if old_bound := old_bound_dict.get(h_id, None):
-            continue
+            pass
         else:
             old_bound = str(u.atoms[int(ids[0]) - 1].bonded_atoms[0].id)
             old_bound_dict[h_id] = old_bound
