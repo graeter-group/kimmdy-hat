@@ -103,6 +103,9 @@ class HAT_reaction(ReactionPlugin):
             raise FileNotFoundError("None of trr, xtc could be found!")
 
         u = MDA.Universe(struc_p, traj_p)
+        if not hasattr(u, "elements"):
+            elements = [t[0] for t in u.atoms.types]
+            u.add_TopologyAttr("elements", elements)
         # u.add_TopologyAttr("elements", u.atoms.types)  # for gro!
 
         # protein = u.select_atoms("not resname SOL Na Cl HO OH HW OW")
@@ -120,6 +123,9 @@ class HAT_reaction(ReactionPlugin):
         if getattr(self.config, "radicals", None) is not None:
             rad_ids = [int(r) for r in (self.config.radicals).split()]
             logger.debug(f"Radicals read from reaction config: {rad_ids}")
+            logger.debug(
+                f"Radical atomtypes: {[u.select_atoms(f'id {rad}').names[0] for rad in rad_ids]}"
+            )
         else:
             # One-based strings in top
             rad_ids = list(self.runmng.top.radicals.keys())
@@ -243,6 +249,7 @@ def make_predictions(
         ys = np.stack(ys)
         ys = np.mean(np.array(ys), 0)
     elif prediction_scheme == "efficient":
+        logger.debug(f"Efficient prediction scheme was chosen.")
         # hyperparameters
         # offset to lowest barrier, 11RT offset means, the rates
         # are less than one millionth of the highest rate
@@ -291,27 +298,38 @@ def make_predictions(
         )
     )
     recipes = []
-
+    old_bound_dict = {}
     with open(files.outputdir / "predictions.csv", "x") as f:
         f.write(" ".join(("npz", "barrier", "rate", "\n")))
         for npz, y, r in zip(se_npzs, ys, rates):
             f.write(" ".join((npz.name, str(y), str(r), "\n")))
 
+    trj_time = []
+    for ts in tqdm(u.trajectory[:], desc="Reading frame-wise simulation time"):
+        trj_time.append(ts.time)  # frame is just index of this list, t in ps
+
     logger.info(f"Max Rate: {max(rates)}, predicted {len(rates)} rates")
-    for meta_d, rate in tqdm(zip(meta_ds, rates)):
+    for meta_d, rate in tqdm(zip(meta_ds, rates), desc="Writing recipes"):
         ids = [str(i) for i in meta_d["indices"][0:2]]  # one-based as ids are written
 
         f1 = meta_d["frame"]
         f2 = meta_d["frame"] + polling_rate
         if f2 >= len(u.trajectory):
             f2 = len(u.trajectory) - 1
-        t1 = u.trajectory[f1].time
-        t2 = u.trajectory[f2].time
-        old_bound = str(u.atoms[int(ids[0]) - 1].bonded_atoms[0].id)
-        # get end position
-        pdb_e = meta_d["meta_path"].with_name(meta_d["meta_path"].stem + "_2.pdb")
+        t1 = trj_time[f1]
+        t2 = trj_time[f1]
+
+        # get id of heavy atom bound to HAT hydrogen before reaction
+        h_id = int(ids[0]) - 1
+        if old_bound := old_bound_dict.get(h_id, None):
+            pass
+        else:
+            old_bound = str(u.atoms[int(ids[0]) - 1].bonded_atoms[0].id)
+            old_bound_dict[h_id] = old_bound
 
         if change_coords == "place":
+            # get end position
+            pdb_e = meta_d["meta_path"].with_name(meta_d["meta_path"].stem + "_2.pdb")
             with open(pdb_e) as f:
                 finished = False
                 while not finished:
