@@ -72,6 +72,13 @@
         "pytype": "int",
         "default": 50
       },
+      "trajectory_format": {
+        "type": "string",
+        "description": "Use either trr or xtc trajectory. Assumes no solvent atoms in xtc', defaults to trr",
+        "pytype": "str",
+        "enum": ["trr","xtc"],
+        "default": "trr"
+      },
       "radicals": {
         "type": "integer",
         "description": "Space-separated string of radical atom ids, can be empty, usually supplyed through kimmdy, optional",
