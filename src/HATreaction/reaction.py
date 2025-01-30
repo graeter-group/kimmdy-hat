@@ -122,7 +122,7 @@ class HAT_reaction(ReactionPlugin):
             u.add_TopologyAttr("elements", elements)
         u.atoms.ids = system_indices + 1
         logger.debug(
-            f"Trajectory mda.Universe properties: {u,len(u.trajectory)}, {u.bonds}, {u.atoms.elements[:10]}, {u.atoms.indices[:10]}\n{trajectory_path}, {topology_path}"
+            f"Trajectory mda.Universe properties: {u}, {len(u.trajectory)} frames, {u.bonds}, elements: {u.atoms.elements[:10]}, indices: {u.atoms.indices[:10]}\n{trajectory_path}, {topology_path}"
         )
 
         se_dir = files.outputdir / "se"
