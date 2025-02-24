@@ -82,37 +82,48 @@ class HAT_reaction(ReactionPlugin):
         self.cap = self.config.cap
         self.change_coords = self.config.change_coords
         self.n_unique = self.config.n_unique
+        self.trajectory_format = self.config.trajectory_format
 
     def get_recipe_collection(self, files) -> RecipeCollection:
 
         logger = files.logger
         logger.debug("Getting recipe for reaction: HAT")
-        # TODO add gro support
-        for suff in ["tpr"]:
-            if self.runmng.latest_files.get(suff, None):
-                struc_p = str(files.input[suff])
-                break
-        else:
-            raise FileNotFoundError("tpr could not be found!")
 
-        for suff in ["trr", "xtc"]:
-            if self.runmng.latest_files.get(suff, None):
-                traj_p = str(files.input[suff])
-                break
-        else:
-            raise FileNotFoundError("None of trr, xtc could be found!")
+        ## trajectory parsing   # TODO add gro support
+        SOL_RESNAMES = ["SOL", "WAT", "TIP3", "TIP4", "CL", "NA", "K"]
+        protein_selection = f"not resname {' '.join(SOL_RESNAMES)}"
 
-        u = MDA.Universe(struc_p, traj_p)
+        # load topology
+        topology_path = files.input["tpr"]
+        u = MDA.Universe(topology_path.as_posix())
+
+        # load trajectory
+        trajectory_path = files.input[self.trajectory_format]
+        if trajectory_path is None:
+            raise FileNotFoundError(
+                f"No trajectory file with format '{self.trajectory_format}' found!"
+            )
+
+        if self.trajectory_format == "trr":
+            system_indices = u.atoms.indices
+        elif self.trajectory_format == "xtc":
+            protein = u.select_atoms(protein_selection)
+            system_indices = protein.indices
+            u = MDA.Merge(u.select_atoms(protein_selection))
+        else:
+            raise NotImplementedError(
+                f"Can't load trajectory with unknown format: {self.trajectory_format}"
+            )
+        u.load_new(trajectory_path.as_posix())
+
+        # add necessary attributes
         if not hasattr(u, "elements"):
             elements = [t[0] for t in u.atoms.types]
             u.add_TopologyAttr("elements", elements)
-        # u.add_TopologyAttr("elements", u.atoms.types)  # for gro!
-
-        # protein = u.select_atoms("not resname SOL Na Cl HO OH HW OW")
-        # protein.guess_bonds()
-
-        # Make ids unique. ids are persistent in subuniverses, indices not
-        u.atoms.ids = u.atoms.indices + 1
+        u.atoms.ids = system_indices + 1
+        logger.debug(
+            f"Trajectory mda.Universe properties: {u}, {len(u.trajectory)} frames, {u.bonds}, elements: {u.atoms.elements[:10]}, indices: {u.atoms.indices[:10]}\n{trajectory_path}, {topology_path}"
+        )
 
         se_dir = files.outputdir / "se"
         if not self.config.keep_structures:

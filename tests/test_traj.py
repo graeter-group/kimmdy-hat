@@ -31,6 +31,7 @@ class DummyRunmanager:
         self.config.reactions.Hat_reaction.keep_structures = False
         self.config.reactions.Hat_reaction.cap = False
         self.config.reactions.Hat_reaction.n_unique = 0
+        self.config.reactions.Hat_reaction.trajectory_format = "trr"
         self.config.changer = DummyClass()
         self.config.changer.topology = DummyClass()
         self.config.changer.topology.parameterization = "grappa"
