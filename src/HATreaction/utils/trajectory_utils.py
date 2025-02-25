@@ -867,7 +867,7 @@ def extract_subsystems(
 
     for ts in tqdm(u.trajectory[slice(start, stop, step)]):
         for i, (rad, bonded_rad) in enumerate(zip(rads, bonded_all)):
-            # skip small distances
+            # skip radical if small distance to another radical
             skip = False
             for j, other_rad in enumerate(rads):
                 if i == j:
@@ -883,6 +883,10 @@ def extract_subsystems(
             if skip:
                 continue
 
+
+
+
+            # need to rewrite this to work on a idx pair basis
             if cap:
                 cut_frame = cap_single_rad(u, ts, rad, bonded_rad, h_cutoff, env_cutoff)
             else:
@@ -936,6 +940,7 @@ def extract_subsystems(
                     )
 
         # saving periodically
+        #TODO: this doesn't do anything because it only counts the number of new reactions (radical-hydrogen pairs)
         if out_dir is not None and len(cut_systems) > 5000:
             if p is not None:
                 p.join()
