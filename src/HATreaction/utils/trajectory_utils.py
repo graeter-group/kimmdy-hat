@@ -883,9 +883,6 @@ def extract_subsystems(
             if skip:
                 continue
 
-
-
-
             # need to rewrite this to work on a idx pair basis
             if cap:
                 cut_frame = cap_single_rad(u, ts, rad, bonded_rad, h_cutoff, env_cutoff)
@@ -940,7 +937,7 @@ def extract_subsystems(
                     )
 
         # saving periodically
-        #TODO: this doesn't do anything because it only counts the number of new reactions (radical-hydrogen pairs)
+        # TODO: this doesn't do anything because it only counts the number of new reactions (radical-hydrogen pairs)
         if out_dir is not None and len(cut_systems) > 5000:
             if p is not None:
                 p.join()
