@@ -316,7 +316,7 @@ def make_predictions(
             f.write(" ".join((npz.name, str(y), str(r), "\n")))
 
     trj_time = []
-    for ts in tqdm(u.trajectory[:], desc="Reading frame-wise simulation time"):
+    for ts in tqdm(u.trajectory[:], desc="Creating list of simulation time for each frame"):
         trj_time.append(ts.time)  # frame is just index of this list, t in ps
 
     logger.info(f"Max Rate: {max(rates)}, predicted {len(rates)} rates")

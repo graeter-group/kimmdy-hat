@@ -865,7 +865,7 @@ def extract_subsystems(
     n_cut_systems = 0
     p = None
 
-    for ts in tqdm(u.trajectory[slice(start, stop, step)]):
+    for ts in tqdm(u.trajectory[slice(start, stop, step)], desc= 'Iterating over Trajectory'):
         for i, (rad, bonded_rad) in enumerate(zip(rads, bonded_all)):
             # skip small distances
             skip = False
@@ -995,7 +995,7 @@ def save_capped_systems(
         out_dir.mkdir(parents=True)
     logger.debug("Start saving..")
 
-    for new_i_hash, vi in systems.items():
+    for new_i_hash, vi in tqdm(systems.items(),desc='Writing out systems grouped by reaction pair'):
         for max_key, system in vi.items():
             sys_d = system[1]  # 0 is translation
             sys_hash = f"{new_i_hash}_{max_key}"
