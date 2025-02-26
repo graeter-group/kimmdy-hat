@@ -936,7 +936,7 @@ def extract_subsystems(
                     )
 
         # saving periodically
-        if out_dir is not None and len(cut_systems) > 5000:
+        if out_dir is not None and (n_cut_systems % 2000) == 0 and n_unique < 1:
             if p is not None:
                 p.join()
             p = Process(
@@ -948,13 +948,21 @@ def extract_subsystems(
                 },
             )
             p.start()
-            # save_capped_systems(cut_systems.values(), out_dir, logger=logger)
             cut_systems = {}
 
     if out_dir is not None:
         if p is not None:
             p.join()
-        save_capped_systems(cut_systems, out_dir, logger=logger)
+        p = Process(
+            target=save_capped_systems,
+            kwargs={
+                "systems": cut_systems,
+                "out_dir": out_dir,
+                "logger": logger,
+            },
+        )
+        p.start()
+        p.join()
         cut_systems = {}
 
     logger.debug(f"Created {n_cut_systems} isolated systems.")
