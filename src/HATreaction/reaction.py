@@ -5,7 +5,11 @@ import logging
 import MDAnalysis as MDA
 import numpy as np
 
-from HATreaction.utils.trajectory_utils import extract_subsystems, extract_subsystems_fast, save_capped_systems
+from HATreaction.utils.trajectory_utils import (
+    extract_subsystems,
+    extract_subsystems_fast,
+    save_capped_systems,
+)
 
 from HATreaction.utils.utils import find_radicals
 from kimmdy.recipe import Bind, Break, Place, Relax, Recipe, RecipeCollection

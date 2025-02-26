@@ -765,7 +765,9 @@ def cap_single_rad(u, ts, rad, bonded_rad, h_cutoff=3, env_cutoff=15):
 
     return capped_systems[np.nonzero(capped_systems)[0]]
 
-def identify_hat_candidates(u: mda.Universe,
+
+def identify_hat_candidates(
+    u: mda.Universe,
     frame: int,
     rad: mda.AtomGroup,
     bonded_rad: mda.AtomGroup,
@@ -812,21 +814,32 @@ def identify_hat_candidates(u: mda.Universe,
     HAT_candidates = []
     for h_idx, h in enumerate(hs):
         for end_idx, end_pos in enumerate(end_poss):
-            if check_cylinderclash(end_pos, h.position, env.positions, r_min=0.8) is True:
+            if (
+                check_cylinderclash(end_pos, h.position, env.positions, r_min=0.8)
+                is True
+            ):
                 continue
             else:
                 translation = np.linalg.norm(end_pos - h.position)
-            HAT_candidates.append({'reaction_ids': (rad.ids[0], h.id), 'translation':translation, 'frame': frame, 'end_pos':end_pos}) 
+            HAT_candidates.append(
+                {
+                    "reaction_ids": (rad.ids[0], h.id),
+                    "translation": translation,
+                    "frame": frame,
+                    "end_pos": end_pos,
+                }
+            )
     return HAT_candidates
+
 
 def extract_by_reaction_ids(
     u: mda.Universe,
     frame: int,
     rad: mda.AtomGroup,
     h: mda.AtomGroup,
-    end_pos = np.ndarray,
+    end_pos=np.ndarray,
     env_cutoff: float = 10,
-    filename:str = ''
+    filename: str = "",
 ) -> dict:
     """Produces one cutout for each possible reaction around one given radical.
 
@@ -856,9 +869,7 @@ def extract_by_reaction_ids(
         "(not resname SOL NA CL)"
     )
 
-
     translation = np.linalg.norm(end_pos - h.positions)
-
 
     other_atms = env - h - rad
 
@@ -884,6 +895,7 @@ def extract_by_reaction_ids(
     cut_system["meta"]["hash_u2"] = abs(hash(cut_system["end_u"]))
 
     return cut_system
+
 
 def extract_subsystems_fast(
     u: mda.Universe,
@@ -986,7 +998,9 @@ def extract_subsystems_fast(
     p = None
 
     hat_candidates = []
-    for ts in tqdm(u.trajectory[slice(start, stop, step)],desc='Searching for HAT candidates'):
+    for ts in tqdm(
+        u.trajectory[slice(start, stop, step)], desc="Searching for HAT candidates"
+    ):
         frame = ts.frame
         for i, (rad, bonded_rad) in enumerate(zip(rads, bonded_all)):
             # skip radical if small distance to another radical
@@ -1005,45 +1019,57 @@ def extract_subsystems_fast(
             if skip:
                 continue
 
-            hat_candidates.extend(identify_hat_candidates(u,frame,rad,bonded_rad,h_cutoff,env_cutoff=h_cutoff+2))
+            hat_candidates.extend(
+                identify_hat_candidates(
+                    u, frame, rad, bonded_rad, h_cutoff, env_cutoff=h_cutoff + 2
+                )
+            )
     logger.debug(f"Found {len(hat_candidates)} HAT candidates.")
 
     if n_unique < 1:
         prediction_targets = hat_candidates
     else:
-        #find hat candidates with lowest n_unique translations
+        # find hat candidates with lowest n_unique translations
         candidates_per_reaction_ids = defaultdict(list)
         for entry in hat_candidates:
-            candidates_per_reaction_ids[entry['reaction_ids']].append(entry)
+            candidates_per_reaction_ids[entry["reaction_ids"]].append(entry)
 
         prediction_targets = []
         for reaction_ids, entries in candidates_per_reaction_ids.items():
             # Sort by 'translation' and select the first 100 (or fewer if there are less than 100)
-            prediction_targets.extend(sorted(entries, key=lambda x: x['translation'])[:n_unique])
+            prediction_targets.extend(
+                sorted(entries, key=lambda x: x["translation"])[:n_unique]
+            )
     logger.debug(f"Selected {len(prediction_targets)} prediction targets.")
 
-
-    #get radical and h ags now once instead of selecting them repeatedly
+    # get radical and h ags now once instead of selecting them repeatedly
     rad_ags = {rad: u.select_atoms(f"id {rad}") for rad in rad_ids}
     h_ags = {}
     predictions_per_frame = defaultdict(list)
     for entry in prediction_targets:
-        predictions_per_frame[entry['frame']].append(entry)
-        if h_ags.get(entry['reaction_ids'][1],None) is None:
-            h_id = entry['reaction_ids'][1]
+        predictions_per_frame[entry["frame"]].append(entry)
+        if h_ags.get(entry["reaction_ids"][1], None) is None:
+            h_id = entry["reaction_ids"][1]
             h_ags[h_id] = u.select_atoms(f"id {h_id}")
 
-    #create cut systems
+    # create cut systems
     filename = u._trajectory.filename
     cut_systems = []
-    for frame, entries in tqdm(predictions_per_frame.items(),desc='Writing HAT structures'):
-        u.trajectory[frame] # set frame of trajectory
+    for frame, entries in tqdm(
+        predictions_per_frame.items(), desc="Writing HAT structures"
+    ):
+        u.trajectory[frame]  # set frame of trajectory
         for entry in entries:
-            cut_sys_dict = extract_by_reaction_ids(u,frame,rad=rad_ags[entry["reaction_ids"][0]],
-                                                h = h_ags[entry["reaction_ids"][1]],end_pos=entry["end_pos"],
-                                               env_cutoff=env_cutoff,filename=filename)
+            cut_sys_dict = extract_by_reaction_ids(
+                u,
+                frame,
+                rad=rad_ags[entry["reaction_ids"][0]],
+                h=h_ags[entry["reaction_ids"][1]],
+                end_pos=entry["end_pos"],
+                env_cutoff=env_cutoff,
+                filename=filename,
+            )
             cut_systems.append(cut_sys_dict)
-
 
         # saving periodically
         if out_dir is not None and len(cut_systems) > 10000:
@@ -1074,6 +1100,7 @@ def extract_subsystems_fast(
         p.start()
         cut_systems = []
     return []
+
 
 def extract_subsystems(
     u: mda.Universe,
@@ -1271,6 +1298,7 @@ def extract_subsystems(
     logger.debug(f"Created {n_cut_systems} isolated systems.")
     return list(cut_systems.values())
 
+
 def save_capped_systems_fast(
     systems: list[dict],
     out_dir,
@@ -1297,8 +1325,10 @@ def save_capped_systems_fast(
         out_dir.mkdir(parents=True)
     logger.debug("Start saving..")
 
-    for sys_d in tqdm(systems,desc='Writing systems'):
-        sys_hash = hash((*sys_d["meta"]["indices"][:2],sys_d["meta"]["translation"]))  # assuming reaction ids + translation to be unique
+    for sys_d in tqdm(systems, desc="Writing systems"):
+        sys_hash = hash(
+            (*sys_d["meta"]["indices"][:2], sys_d["meta"]["translation"])
+        )  # assuming reaction ids + translation to be unique
 
         sys_d["start_u"].atoms.write(out_dir / f"{sys_hash}_1.pdb")
         sys_d["end_u"].atoms.write(out_dir / f"{sys_hash}_2.pdb")
@@ -1319,6 +1349,7 @@ def save_capped_systems_fast(
         else:
             raise OSError("Input/output error")
     logger.info(f"Saved {len(systems)} systems.")
+
 
 def save_capped_systems(
     systems: list[tuple],
