@@ -181,7 +181,7 @@ class HAT_reaction(ReactionPlugin):
             #         view._set_selection("@" + ",".join(rad_ids), repr_index=1)
             #         view.center()
             #         view
-            extract_subsystems(
+            extract_subsystems_fast(
                 u,
                 rad_ids,
                 h_cutoff=self.h_cutoff,
@@ -320,7 +320,9 @@ def make_predictions(
             f.write(" ".join((npz.name, str(y), str(r), "\n")))
 
     trj_time = []
-    for ts in tqdm(u.trajectory[:], desc="Reading frame-wise simulation time"):
+    for ts in tqdm(
+        u.trajectory[:], desc="Creating list of simulation time for each frame"
+    ):
         trj_time.append(ts.time)  # frame is just index of this list, t in ps
 
     logger.info(f"Max Rate: {max(rates)}, predicted {len(rates)} rates")

@@ -816,19 +816,20 @@ def identify_hat_candidates(
         for end_idx, end_pos in enumerate(end_poss):
             if (
                 check_cylinderclash(end_pos, h.position, env.positions, r_min=0.8)
-                is True
+                is False
             ):
-                continue
+                # function returns False if there is a clash
+                pass
             else:
                 translation = np.linalg.norm(end_pos - h.position)
-            HAT_candidates.append(
-                {
-                    "reaction_ids": (rad.ids[0], h.id),
-                    "translation": translation,
-                    "frame": frame,
-                    "end_pos": end_pos,
-                }
-            )
+                HAT_candidates.append(
+                    {
+                        "reaction_ids": (rad.ids[0], h.id),
+                        "translation": translation,
+                        "frame": frame,
+                        "end_pos": end_pos,
+                    }
+                )
     return HAT_candidates
 
 
@@ -1033,6 +1034,9 @@ def extract_subsystems_fast(
         candidates_per_reaction_ids = defaultdict(list)
         for entry in hat_candidates:
             candidates_per_reaction_ids[entry["reaction_ids"]].append(entry)
+        logger.debug(
+            f"{len(candidates_per_reaction_ids.keys())} unique reactions in HAT candidates."
+        )
 
         prediction_targets = []
         for reaction_ids, entries in candidates_per_reaction_ids.items():
@@ -1098,6 +1102,7 @@ def extract_subsystems_fast(
             },
         )
         p.start()
+        p.join()
         cut_systems = []
     return []
 

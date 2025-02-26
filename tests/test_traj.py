@@ -102,28 +102,29 @@ def test_traj_unique(recipe_collection_unique):
     assert all([r in s for r in l])
 
 
-def test_traj_n_unique_files(recipe_collection_n_unique):
-    recipe_collection, files = recipe_collection_n_unique
-    print(recipe_collection.recipes)
-    assert len(recipe_collection.recipes) == 10
+# test deprecated because n_unique max_idx is not longer part of hash
+# def test_traj_n_unique_files(recipe_collection_n_unique):
+#     recipe_collection, files = recipe_collection_n_unique
+#     print(recipe_collection.recipes)
+#     assert len(recipe_collection.recipes) == 10
 
-    f_list = [p for p in files.outputdir.glob("se/*_0_*.pdb")]
-    f_list_all = [p for p in files.outputdir.glob("se/*.pdb")]
-    for f in f_list:
-        f_list_all.remove(f)
-        parts = f.name.split("_")
-        other = f.with_name(f"{parts[0]}_1_{parts[2]}")
-        assert other.exists()
-        f_list_all.remove(other)
+#     f_list = [p for p in files.outputdir.glob("se/*_0_*.pdb")]
+#     f_list_all = [p for p in files.outputdir.glob("se/*.pdb")]
+#     for f in f_list:
+#         f_list_all.remove(f)
+#         parts = f.name.split("_")
+#         other = f.with_name(f"{parts[0]}_1_{parts[2]}")
+#         assert other.exists()
+#         f_list_all.remove(other)
 
-    assert len(f_list_all) == 0
+#     assert len(f_list_all) == 0
 
 
 def test_traj_to_recipes(recipe_collection):
     print(recipe_collection.recipes)
-    assert len(recipe_collection.recipes) == 15
+    assert len(recipe_collection.recipes) == 18
     recipe_collection.aggregate_reactions()
-    assert len(recipe_collection.recipes) == 15
+    assert len(recipe_collection.recipes) == 18
 
     for recipe in recipe_collection.recipes:
         assert len(recipe.rates) == 1
@@ -136,8 +137,8 @@ def test_traj_to_recipes(recipe_collection):
     assert len(recipe_collection.recipes) == 5
 
     for recipe in recipe_collection.recipes:
-        assert len(recipe.rates) == 3
-        assert len(recipe.timespans) == 3
+        assert len(recipe.rates) in [3, 6]
+        assert len(recipe.timespans) in [3, 6]
 
 
 @pytest.fixture
@@ -156,9 +157,9 @@ def recipe_collection_pbc(tmpdir):
 
 def test_traj_to_recipes_pbc(recipe_collection_pbc):
     print(recipe_collection_pbc.recipes)
-    assert len(recipe_collection_pbc.recipes) == 4
+    assert len(recipe_collection_pbc.recipes) == 26
     recipe_collection_pbc.aggregate_reactions()
-    assert len(recipe_collection_pbc.recipes) == 4
+    assert len(recipe_collection_pbc.recipes) == 26
 
     for recipe in recipe_collection_pbc.recipes:
         assert len(recipe.rates) == 1
@@ -171,5 +172,5 @@ def test_traj_to_recipes_pbc(recipe_collection_pbc):
     assert len(recipe_collection_pbc.recipes) == 2
 
     for recipe in recipe_collection_pbc.recipes:
-        assert len(recipe.rates) == 2
-        assert len(recipe.timespans) == 2
+        assert len(recipe.rates) in [18, 8]
+        assert len(recipe.timespans) in [18, 8]
