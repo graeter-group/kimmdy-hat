@@ -109,9 +109,11 @@ class HAT_reaction(ReactionPlugin):
             )
 
         if self.trajectory_format == "trr":
+            logger.debug(f"Taking trr trajectory for HAT prediction.")
             system_indices = u.atoms.indices
         elif self.trajectory_format == "xtc":
             protein = u.select_atoms(protein_selection)
+            logger.debug(f"Taking xtc trajectory for HAT prediction.")
             system_indices = protein.indices
             u = MDA.Merge(u.select_atoms(protein_selection))
         else:
