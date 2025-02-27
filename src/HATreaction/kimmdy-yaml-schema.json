@@ -74,10 +74,10 @@
       },
       "trajectory_format": {
         "type": "string",
-        "description": "Use either trr or xtc trajectory. Assumes no solvent atoms in xtc', defaults to trr",
+        "description": "Use either trr or xtc trajectory. Assumes no solvent atoms in xtc', defaults to xtc",
         "pytype": "str",
         "enum": ["trr","xtc"],
-        "default": "trr"
+        "default": "xtc"
       },
       "radicals": {
         "type": "integer",
