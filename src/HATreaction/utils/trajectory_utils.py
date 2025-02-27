@@ -1056,6 +1056,7 @@ def extract_subsystems_fast(
             h_id = entry["reaction_ids"][1]
             h_ags[h_id] = u.select_atoms(f"id {h_id}")
 
+    logger.info(f"Starting to write out {len(prediction_targets)} prediction targets.")
     # create cut systems
     filename = u._trajectory.filename
     cut_systems = []
@@ -1076,7 +1077,7 @@ def extract_subsystems_fast(
             cut_systems.append(cut_sys_dict)
 
         # saving periodically
-        if out_dir is not None and len(cut_systems) > 10000:
+        if out_dir is not None and len(cut_systems) > 2000:
             if p is not None:
                 p.join()
             p = Process(
