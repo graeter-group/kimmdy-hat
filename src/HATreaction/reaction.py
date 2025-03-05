@@ -122,7 +122,7 @@ class HAT_reaction(ReactionPlugin):
 
         # add necessary attributes
         if not hasattr(u, "elements"):
-            elements = [t[0] for t in u.atoms.types]
+            elements = [t[0].upper() for t in u.atoms.types]
             u.add_TopologyAttr("elements", elements)
         u.atoms.ids = system_indices + 1
         logger.debug(
