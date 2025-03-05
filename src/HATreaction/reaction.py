@@ -336,7 +336,7 @@ def make_predictions(
         if f2 >= len(u.trajectory):
             f2 = len(u.trajectory) - 1
         t1 = trj_time[f1]
-        t2 = trj_time[f1]
+        t2 = trj_time[f2]
 
         # get id of heavy atom bound to HAT hydrogen before reaction
         h_id = int(ids[0]) - 1
