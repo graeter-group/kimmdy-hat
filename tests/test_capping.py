@@ -1,6 +1,6 @@
 # %%
 from pathlib import Path
-from HATreaction.utils import trajectory_utils
+from HATreaction.utils import capping_utils
 import pickle
 import json
 import pytest
@@ -57,7 +57,7 @@ def test_capping(cap_ref, universe):
     true_cap_idxs = cap_ref["cap_idxs"]
     true_cap_positions_flat = cap_ref["cap_positions_flat"]
 
-    cap, cap_idxs = trajectory_utils.cap_aa(universe.copy().atoms[inp_atm_idx])
+    cap, cap_idxs = capping_utils.cap_aa(universe.copy().atoms[inp_atm_idx])
 
     assert true_cap_idxs == [int(p) for p in cap_idxs], "Cap ids wrong"
     assert true_cap_positions_flat == pytest.approx(
@@ -90,7 +90,7 @@ def test_capping(cap_ref, universe):
 #         for res in res_sel:
 #             atms = res.atoms
 
-#             cap, cap_idxs = trajectory_utils.cap_aa(atms)
+#             cap, cap_idxs = capping_utils.cap_aa(atms)
 
 #             view = ngl.show_mdanalysis(atms, default_representation=False)
 #             view.add_licorice(opacity=0.7)
