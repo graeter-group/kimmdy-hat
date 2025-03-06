@@ -7,8 +7,6 @@ import numpy as np
 
 from HATreaction.utils.trajectory_utils import (
     extract_subsystems,
-    extract_subsystems_fast,
-    save_capped_systems,
 )
 
 from HATreaction.utils.utils import find_radicals
@@ -183,7 +181,7 @@ class HAT_reaction(ReactionPlugin):
             #         view._set_selection("@" + ",".join(rad_ids), repr_index=1)
             #         view.center()
             #         view
-            extract_subsystems_fast(
+            extract_subsystems(
                 u,
                 rad_ids,
                 h_cutoff=self.h_cutoff,
