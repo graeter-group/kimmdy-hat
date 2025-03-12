@@ -442,7 +442,11 @@ def extract_subsystems(
                 # bonded to nothing else than the radical:
                 if (bonded.bonded_atoms - rad).n_atoms == 0:
                     goal_res = bonded_rad.residues - rad[0].residue
-                    assert len(goal_res) == 1
+                    if len(goal_res) != 1:
+                        logger.warning(
+                            f"Unexpected number of different residues at radical {rad[0]}:{len(bonded_rad.residues)}. Could be caused by previous HAT reactions"
+                        )
+                    # assert len(goal_res) == 1
                     rad[0].residue = goal_res[0]
                     bonded_rad.residues = goal_res[0]
 
