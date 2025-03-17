@@ -147,8 +147,12 @@ class HAT_reaction(ReactionPlugin):
             logger.debug(f"Radicals obtained from runmanager: {rad_ids}")
         if len(rad_ids) < 1:
             logger.debug("No radicals known, searching in structure..")
+            radicals = find_radicals(u)
+            for rad in radicals:
+                logger.debug(f"{rad}")
             rad_ids = [str(a[0].id) for a in find_radicals(u)]
         logger.info(f"Found {len(rad_ids)} radicals")
+        logger.debug(f"Radicals: {rad_ids}")
         if len(rad_ids) < 1:
             logger.info("--> retuning empty recipe collection")
             return RecipeCollection([])
