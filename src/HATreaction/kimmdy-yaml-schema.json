@@ -68,16 +68,16 @@
       },
       "n_unique": {
         "type": "integer",
-        "description": "Only consider the n frames per reaction with the smallest translation distances. Set to 0 to consider all, defaults to 50",
+        "description": "Only consider the n frames per reaction with the smallest translation distances. Set to 0 to consider all, defaults to 100",
         "pytype": "int",
-        "default": 50
+        "default": 100
       },
       "trajectory_format": {
         "type": "string",
-        "description": "Use either trr or xtc trajectory. Assumes no solvent atoms in xtc', defaults to trr",
+        "description": "Use either trr or xtc trajectory. Assumes no solvent atoms in xtc', defaults to xtc",
         "pytype": "str",
         "enum": ["trr","xtc"],
-        "default": "trr"
+        "default": "xtc"
       },
       "radicals": {
         "type": "integer",

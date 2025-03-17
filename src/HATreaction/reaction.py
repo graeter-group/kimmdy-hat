@@ -5,7 +5,9 @@ import logging
 import MDAnalysis as MDA
 import numpy as np
 
-from HATreaction.utils.trajectory_utils import extract_subsystems, save_capped_systems
+from HATreaction.utils.trajectory_utils import (
+    extract_subsystems,
+)
 
 from HATreaction.utils.utils import find_radicals
 from kimmdy.recipe import Bind, Break, Place, Relax, Recipe, RecipeCollection
@@ -94,7 +96,9 @@ class HAT_reaction(ReactionPlugin):
         protein_selection = f"not resname {' '.join(SOL_RESNAMES)}"
 
         # load topology
-        topology_path = files.input["tpr"]
+        topology_path = files.input[
+            "tpr"
+        ]  # gro could be used but contains no explicit bonded information and is limited to 100k/1Mio atom indices
         u = MDA.Universe(topology_path.as_posix())
 
         # load trajectory
@@ -105,9 +109,11 @@ class HAT_reaction(ReactionPlugin):
             )
 
         if self.trajectory_format == "trr":
+            logger.debug(f"Taking trr trajectory for HAT prediction.")
             system_indices = u.atoms.indices
         elif self.trajectory_format == "xtc":
             protein = u.select_atoms(protein_selection)
+            logger.debug(f"Taking xtc trajectory for HAT prediction.")
             system_indices = protein.indices
             u = MDA.Merge(u.select_atoms(protein_selection))
         else:
@@ -118,7 +124,8 @@ class HAT_reaction(ReactionPlugin):
 
         # add necessary attributes
         if not hasattr(u, "elements"):
-            elements = [t[0] for t in u.atoms.types]
+            # TODO: Make work for 2 character elements
+            elements = [t[0].upper() for t in u.atoms.types]
             u.add_TopologyAttr("elements", elements)
         u.atoms.ids = system_indices + 1
         logger.debug(
@@ -143,40 +150,19 @@ class HAT_reaction(ReactionPlugin):
             logger.debug(f"Radicals obtained from runmanager: {rad_ids}")
         if len(rad_ids) < 1:
             logger.debug("No radicals known, searching in structure..")
+            radicals = find_radicals(u)
+            for rad in radicals:
+                logger.debug(f"{rad}")
             rad_ids = [str(a[0].id) for a in find_radicals(u)]
         logger.info(f"Found {len(rad_ids)} radicals")
+        logger.debug(f"Radicals: {rad_ids}")
         if len(rad_ids) < 1:
             logger.info("--> retuning empty recipe collection")
             return RecipeCollection([])
 
         rad_ids = sorted(rad_ids)
-        # sub_atms = u.select_atoms(
-        #     f"((not resname SOL NA CL) and (around 20 id {' '.join([i for i in rad_ids])}))"
-        #     f" or id {' '.join([i for i in rad_ids])}",
-        #     updating=True,
-        # )
+
         try:
-            # environment around radical is updated by ts incrementation
-            logger.info("Extracting radical structures from trajectory.")
-            # u_sub = MDA.Merge(sub_atms)
-            # u_sub.trajectory[0].dimensions = ts.dimensions
-            # for ts in tqdm(u.trajectory[:: self.polling_rate]):
-
-            #     # check manually w/ ngl:
-            #     if 0:
-            #         import nglview as ngl
-
-            #         view = ngl.show_mdanalysis(u_sub, defaultRepresentation=False)
-            #         view.representations = [
-            #             {"type": "ball+stick", "params": {"sele": ""}},
-            #             {
-            #                 "type": "spacefill",
-            #                 "params": {"sele": "", "radiusScale": 0.7},
-            #             },
-            #         ]
-            #         view._set_selection("@" + ",".join(rad_ids), repr_index=1)
-            #         view.center()
-            #         view
             extract_subsystems(
                 u,
                 rad_ids,
@@ -316,7 +302,9 @@ def make_predictions(
             f.write(" ".join((npz.name, str(y), str(r), "\n")))
 
     trj_time = []
-    for ts in tqdm(u.trajectory[:], desc="Reading frame-wise simulation time"):
+    for ts in tqdm(
+        u.trajectory[:], desc="Creating list of simulation time for each frame"
+    ):
         trj_time.append(ts.time)  # frame is just index of this list, t in ps
 
     logger.info(f"Max Rate: {max(rates)}, predicted {len(rates)} rates")
@@ -328,7 +316,7 @@ def make_predictions(
         if f2 >= len(u.trajectory):
             f2 = len(u.trajectory) - 1
         t1 = trj_time[f1]
-        t2 = trj_time[f1]
+        t2 = trj_time[f2]
 
         # get id of heavy atom bound to HAT hydrogen before reaction
         h_id = int(ids[0]) - 1
