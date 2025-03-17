@@ -96,7 +96,9 @@ class HAT_reaction(ReactionPlugin):
         protein_selection = f"not resname {' '.join(SOL_RESNAMES)}"
 
         # load topology
-        topology_path = files.input["tpr"]
+        topology_path = files.input[
+            "tpr"
+        ]  # gro could be used but contains no explicit bonded information and is limited to 100k/1Mio atom indices
         u = MDA.Universe(topology_path.as_posix())
 
         # load trajectory
@@ -122,6 +124,7 @@ class HAT_reaction(ReactionPlugin):
 
         # add necessary attributes
         if not hasattr(u, "elements"):
+            # TODO: Make work for 2 character elements
             elements = [t[0].upper() for t in u.atoms.types]
             u.add_TopologyAttr("elements", elements)
         u.atoms.ids = system_indices + 1
@@ -158,33 +161,8 @@ class HAT_reaction(ReactionPlugin):
             return RecipeCollection([])
 
         rad_ids = sorted(rad_ids)
-        # sub_atms = u.select_atoms(
-        #     f"((not resname SOL NA CL) and (around 20 id {' '.join([i for i in rad_ids])}))"
-        #     f" or id {' '.join([i for i in rad_ids])}",
-        #     updating=True,
-        # )
+
         try:
-            # environment around radical is updated by ts incrementation
-            logger.info("Extracting radical structures from trajectory.")
-            # u_sub = MDA.Merge(sub_atms)
-            # u_sub.trajectory[0].dimensions = ts.dimensions
-            # for ts in tqdm(u.trajectory[:: self.polling_rate]):
-
-            #     # check manually w/ ngl:
-            #     if 0:
-            #         import nglview as ngl
-
-            #         view = ngl.show_mdanalysis(u_sub, defaultRepresentation=False)
-            #         view.representations = [
-            #             {"type": "ball+stick", "params": {"sele": ""}},
-            #             {
-            #                 "type": "spacefill",
-            #                 "params": {"sele": "", "radiusScale": 0.7},
-            #             },
-            #         ]
-            #         view._set_selection("@" + ",".join(rad_ids), repr_index=1)
-            #         view.center()
-            #         view
             extract_subsystems(
                 u,
                 rad_ids,

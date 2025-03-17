@@ -296,16 +296,18 @@ def extract_by_reaction_ids(
     ----------
     u
         Universe around the radical
-    ts
-        current timestep
+    frame
+        frame of the trajectory
     rad
-        radical
-    bonded_rad
-        all atoms bound to the radical
-    h_cutoff
-        maximum distance a hydrogen can travel, by default 3
+        radical heavy atom participating in proposed reaction
+    h
+        hydrogen atom participating in proposed reaction
+    end_pos
+        end position of the reactive hydrogen
     env_cutoff
         size of cutout to make, by default 10
+    filename
+        trajectory filename
 
     Returns
     -------
@@ -355,7 +357,7 @@ def extract_subsystems(
     stop: Optional[int] = None,
     step: Optional[int] = None,
     rad_min_dist: float = 3,
-    n_unique: int = 50,
+    n_unique: int = 100,
     cap: bool = True,
     out_dir: Optional[Path] = None,
     logger: logging.Logger = logging.getLogger(__name__),
