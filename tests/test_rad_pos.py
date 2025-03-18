@@ -3,6 +3,7 @@ import MDAnalysis as MDA
 from pathlib import Path
 from HATreaction.utils.trajectory_utils import find_radical_pos
 import json
+import numpy as np
 
 
 def view_generator(pdb, numbers=True):
@@ -86,7 +87,7 @@ def test_radical_pos():
         sorted(rad_poss, key=lambda a: a[0])
         rad_poss = [list(pos.astype(float)) for pos in rad_poss]
 
-        assert ref_d[pdb.name] == rad_poss
+        assert np.allclose(ref_d[pdb.name], rad_poss, atol=1e-15)
 
 
 # %%

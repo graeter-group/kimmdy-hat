@@ -12,7 +12,6 @@ class DummyClass:
 
 
 class DummyRunmanager:
-
     def __init__(self):
         self.config = DummyClass()
         self.config.reactions = DummyClass()

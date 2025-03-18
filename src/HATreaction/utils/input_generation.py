@@ -1,11 +1,11 @@
 import tensorflow as tf
 from tensorflow.python.data.ops.dataset_ops import Dataset
 import numpy as np
-from kgcnn.graph.adj import (
+from kgcnn.graph.methods import (
     coordinates_to_distancematrix,
     define_adjacency_from_distance,
 )
-from kgcnn.graph.adj import sort_edge_indices
+from kgcnn.graph.methods import sort_edge_indices
 from ase.io import read
 from pathlib import Path
 from tqdm.autonotebook import tqdm
