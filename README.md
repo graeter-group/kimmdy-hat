@@ -10,8 +10,7 @@ Plugin for KIMMDY to perform hydrogen atom transfer reactions. Loads a trained t
 * Presetup:
 
     ```bash
-    pip install --no-cache-dir --extra-index-url https://pypi.nvidia.com tensorrt-libs
-    pip install tensorflow[and-cuda]==2.15.0
+    pip install tensorflow[and-cuda]==2.15.1
     ```
 
 * `pip install -e ./`  or for development: `pip install -r requirements.txt`
