@@ -1,5 +1,5 @@
 # %%
-import MDAnalysis as MDA
+import MDAnalysis as mda
 from pathlib import Path
 from HATreaction.utils.trajectory_utils import find_radical_pos
 import json
@@ -8,7 +8,7 @@ import json
 def view_generator(pdb, numbers=True):
     import nglview as ngl
 
-    u = MDA.Universe(pdb, guess_bonds=True)
+    u = mda.Universe(pdb, guess_bonds=True)
     view = ngl.show_mdanalysis(u)
     view.clear()
     view.representations = [
@@ -76,7 +76,7 @@ def test_radical_pos():
             ref_d = json.load(f)
 
     for pdb in (Path(__file__).parent / "test_rad_pos").glob("*.pdb"):
-        u = MDA.Universe(pdb)
+        u = mda.Universe(pdb)
         idx = pdb.stem.split("_")[-1]
 
         test_atom = u.select_atoms(f"index {idx}")[0]
