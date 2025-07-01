@@ -41,4 +41,4 @@ where = ["src"]
 namespaces = false
 
 [dependency-groups]
-dev = ["pytest", "pytest-cov", "black", "hypothesis"]
+dev = ["pytest", "pytest-cov", "black", "hypothesis", "nglview"]
