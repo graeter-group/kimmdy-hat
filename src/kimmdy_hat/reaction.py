@@ -5,11 +5,11 @@ import logging
 import MDAnalysis as MDA
 import numpy as np
 
-from HATreaction.utils.trajectory_utils import (
+from kimmdy_hat.utils.trajectory_utils import (
     extract_subsystems,
 )
 
-from HATreaction.utils.utils import find_radicals
+from kimmdy_hat.utils.utils import find_radicals
 from kimmdy.recipe import Bind, Break, Place, Relax, Recipe, RecipeCollection
 from kimmdy.plugins import ReactionPlugin
 
@@ -224,7 +224,7 @@ def make_predictions(
     files,
     logger: logging.Logger = logging.getLogger(__name__),
 ):
-    from HATreaction.utils.input_generation import create_meta_dataset_predictions
+    from kimmdy_hat.utils.input_generation import create_meta_dataset_predictions
 
     # Build input features
     se_npzs = list(se_dir.glob("*.npz"))

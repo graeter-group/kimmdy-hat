@@ -14,7 +14,7 @@ import logging
 from pickle import UnpicklingError
 
 # KGCNN==2.1.0, tensorflow==2.10.0
-version = 0.6  # Also used in HATreaction pluginversion
+version = 0.6  # Also used in kimmdy_hat pluginversion
 
 
 def _preproc_pdb(pdbs):

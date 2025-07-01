@@ -11,7 +11,7 @@ from typing import Optional
 import MDAnalysis as mda
 import MDAnalysis.core.universe
 
-from HATreaction.utils.utils import check_cylinderclash
+from kimmdy_hat.utils.utils import check_cylinderclash
 
 
 version = 0.9

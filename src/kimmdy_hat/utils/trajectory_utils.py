@@ -10,7 +10,7 @@ import numpy as np
 import time
 from scipy.spatial.transform import Rotation
 
-from HATreaction.utils.utils import check_cylinderclash
+from kimmdy_hat.utils.utils import check_cylinderclash
 from typing import Optional
 import numpy.typing as npt
 from pathlib import Path

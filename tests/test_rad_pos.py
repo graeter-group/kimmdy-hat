@@ -1,7 +1,7 @@
 # %%
 import MDAnalysis as MDA
 from pathlib import Path
-from HATreaction.utils.trajectory_utils import find_radical_pos
+from kimmdy_hat.utils.trajectory_utils import find_radical_pos
 import json
 
 

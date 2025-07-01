@@ -8,7 +8,7 @@ import MDAnalysis as mda
 from MDAnalysis.coordinates.XTC import XTCReader
 from MDAnalysis.analysis.distances import self_distance_array
 
-from HATreaction.utils.capping_utils import (
+from kimmdy_hat.utils.capping_utils import (
     save_capped_systems,
     extract_subsystems_capped,
 )

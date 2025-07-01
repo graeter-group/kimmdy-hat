@@ -1,6 +1,6 @@
 # %%
 from pathlib import Path
-from HATreaction import HAT_reaction
+from kimmdy_hat import HAT_reaction
 import pytest
 from pprint import pprint
 import logging

@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=61.2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kimmdy-hat"
+version = "0.2"
+license-files = ["LICEN[CS]E*"]
+description = "Hydrogen Atom Transfer Plugin for KIMMDY"
+authors = [{ name = "Kai Riedmiller", email = "kai.riedmiller@h-its.org" }]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: GNU General Public License (GPL)",
+  "Operating System :: OS Independent",
+]
+requires-python = ">= 3.9, <3.12"
+dependencies = [
+  "ase",
+  "numpy<1.24",
+  "kgcnn==2.1.0",
+  "MDAnalysis>=2.5.0",
+  "tensorflow<2.16",
+]
+
+[project.readme]
+file = "README.md"
+content-type = "text/markdown"
+
+[project.entry-points."kimmdy.reaction_plugins"]
+hat_reaction = "HATreaction.reaction:HAT_reaction"
+
+[project.scripts]
+HAT_reaction = "kimmdy.cmd:kimmdy"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+namespaces = false
+
+[dependency-groups]
+dev = ["pytest", "pytest-cov", "black", "hypothesis"]
