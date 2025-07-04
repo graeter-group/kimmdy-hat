@@ -24,7 +24,7 @@ def get_cmdline_args():
         )
     )
     parser.add_argument(
-        "--version", action="version", version=f'HAT reactions {version("HATreaction")}'
+        "--version", action="version", version=f'HAT reactions {version("kimmdy_hat")}'
     )
     parser.add_argument(
         "--top",

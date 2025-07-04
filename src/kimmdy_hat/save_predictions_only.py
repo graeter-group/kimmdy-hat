@@ -12,7 +12,7 @@ from tqdm.autonotebook import tqdm
 from collections import defaultdict
 from importlib.resources import files as res_files
 
-from HATreaction.reaction import make_predictions
+from kimmdy_hat.reaction import make_predictions
 import tensorflow as tf
 import MDAnalysis as mda
 from MDAnalysis.exceptions import NoDataError

@@ -5,11 +5,11 @@ import logging
 import MDAnalysis as MDA
 import numpy as np
 
-from HATreaction.utils.trajectory_utils import (
+from kimmdy_hat.utils.trajectory_utils import (
     extract_subsystems,
 )
 
-from HATreaction.utils.utils import find_radicals
+from kimmdy_hat.utils.utils import find_radicals
 from kimmdy.recipe import Bind, Break, Place, Relax, Recipe, RecipeCollection
 from kimmdy.plugins import ReactionPlugin
 
@@ -87,7 +87,6 @@ class HAT_reaction(ReactionPlugin):
         self.trajectory_format = self.config.trajectory_format
 
     def get_recipe_collection(self, files) -> RecipeCollection:
-
         logger = files.logger
         logger.debug("Getting recipe for reaction: HAT")
 
@@ -109,11 +108,11 @@ class HAT_reaction(ReactionPlugin):
             )
 
         if self.trajectory_format == "trr":
-            logger.debug(f"Taking trr trajectory for HAT prediction.")
+            logger.debug("Taking trr trajectory for HAT prediction.")
             system_indices = u.atoms.indices
         elif self.trajectory_format == "xtc":
             protein = u.select_atoms(protein_selection)
-            logger.debug(f"Taking xtc trajectory for HAT prediction.")
+            logger.debug("Taking xtc trajectory for HAT prediction.")
             system_indices = protein.indices
             u = MDA.Merge(u.select_atoms(protein_selection))
         else:
@@ -129,7 +128,9 @@ class HAT_reaction(ReactionPlugin):
             u.add_TopologyAttr("elements", elements)
         u.atoms.ids = system_indices + 1
         logger.debug(
-            f"Trajectory mda.Universe properties: {u}, {len(u.trajectory)} frames, {u.bonds}, elements: {u.atoms.elements[:10]}, indices: {u.atoms.indices[:10]}\n{trajectory_path}, {topology_path}"
+            f"Trajectory mda.Universe properties: {u}, {len(u.trajectory)} frames, "
+            f"{u.bonds}, elements: {u.atoms.elements[:10]}, "
+            f"indices: {u.atoms.indices[:10]}\n{trajectory_path}, {topology_path}"
         )
 
         se_dir = files.outputdir / "se"
@@ -224,7 +225,7 @@ def make_predictions(
     files,
     logger: logging.Logger = logging.getLogger(__name__),
 ):
-    from HATreaction.utils.input_generation import create_meta_dataset_predictions
+    from kimmdy_hat.utils.input_generation import create_meta_dataset_predictions
 
     # Build input features
     se_npzs = list(se_dir.glob("*.npz"))
@@ -246,7 +247,7 @@ def make_predictions(
         ys = np.stack(ys)
         ys = np.mean(np.array(ys), 0)
     elif prediction_scheme == "efficient":
-        logger.debug(f"Efficient prediction scheme was chosen.")
+        logger.debug("Efficient prediction scheme was chosen.")
         # hyperparameters
         # offset to lowest barrier, 11RT offset means, the rates
         # are less than one millionth of the highest rate

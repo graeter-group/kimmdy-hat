@@ -68,9 +68,6 @@ docs/_build/
 profile_default/
 ipython_config.py
 
-# pyenv
-.python-version
-
 # Environments
 .env
 .venv

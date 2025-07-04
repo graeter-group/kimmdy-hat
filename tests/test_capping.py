@@ -1,6 +1,6 @@
 # %%
 from pathlib import Path
-from HATreaction.utils import capping_utils
+from kimmdy_hat.utils import capping_utils
 import pickle
 import json
 import pytest
