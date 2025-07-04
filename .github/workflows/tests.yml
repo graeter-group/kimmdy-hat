@@ -13,6 +13,7 @@ jobs:
     container: riedmiki/gromacs-plumed-python:2023.5-plumed
     steps:
       - uses: actions/checkout@v4
+      - uses: psf/black@stable
 
       - name: Install uv
         uses: astral-sh/setup-uv@v5
@@ -22,7 +23,6 @@ jobs:
         with:
           python-version-file: ".python-version"
 
-      - uses: psf/black@stable
       - name: run pytest
         run: uv run pytest --cov --cov-report=html
       - name: zip coverage report
