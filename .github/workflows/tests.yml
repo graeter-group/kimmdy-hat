@@ -13,15 +13,22 @@ jobs:
     container: riedmiki/gromacs-plumed-python:2023.5-plumed
     steps:
       - uses: actions/checkout@v4
+
       - uses: psf/black@stable
 
       - name: Install uv
         uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
 
       - name: "Set up Python"
         uses: actions/setup-python@v5
         with:
           python-version-file: ".python-version"
+
+      - name: "Install kimmdy-hat"
+        run: uv sync --locked --all-extras --dev
 
       - name: run pytest
         run: uv run pytest --cov --cov-report=html
