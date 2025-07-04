@@ -27,7 +27,7 @@ file = "README.md"
 content-type = "text/markdown"
 
 [project.entry-points."kimmdy.reaction_plugins"]
-hat_reaction = "HATreaction.reaction:HAT_reaction"
+hat_reaction = "kimmdy_hat.reaction:HAT_reaction"
 
 [project.scripts]
 HAT_reaction = "kimmdy.cmd:kimmdy"
