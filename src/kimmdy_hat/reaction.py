@@ -46,12 +46,12 @@ class HAT_reaction(ReactionPlugin):
             ens_glob = self.config.model
 
         ensemble_dirs = list(res_files("HATmodels").glob(ens_glob + "*"))
-        assert (
-            len(ensemble_dirs) > 0
-        ), f"Model {ens_glob} not found. Please check your config yml."
-        assert (
-            len(ensemble_dirs) == 1
-        ), f"Multiple Models found for {ens_glob}. Please check your config yml."
+        assert len(ensemble_dirs) > 0, (
+            f"Model {ens_glob} not found. Please check your config yml."
+        )
+        assert len(ensemble_dirs) == 1, (
+            f"Multiple Models found for {ens_glob}. Please check your config yml."
+        )
         ensemble_dir = ensemble_dirs[0]
         logging.info(f"Using HAT model: {ensemble_dir.name}")
         ensemble_size = getattr(self.config, "enseble_size", None)
@@ -87,7 +87,6 @@ class HAT_reaction(ReactionPlugin):
         self.trajectory_format = self.config.trajectory_format
 
     def get_recipe_collection(self, files) -> RecipeCollection:
-
         logger = files.logger
         logger.debug("Getting recipe for reaction: HAT")
 
@@ -109,11 +108,11 @@ class HAT_reaction(ReactionPlugin):
             )
 
         if self.trajectory_format == "trr":
-            logger.debug(f"Taking trr trajectory for HAT prediction.")
+            logger.debug("Taking trr trajectory for HAT prediction.")
             system_indices = u.atoms.indices
         elif self.trajectory_format == "xtc":
             protein = u.select_atoms(protein_selection)
-            logger.debug(f"Taking xtc trajectory for HAT prediction.")
+            logger.debug("Taking xtc trajectory for HAT prediction.")
             system_indices = protein.indices
             u = MDA.Merge(u.select_atoms(protein_selection))
         else:
@@ -129,7 +128,9 @@ class HAT_reaction(ReactionPlugin):
             u.add_TopologyAttr("elements", elements)
         u.atoms.ids = system_indices + 1
         logger.debug(
-            f"Trajectory mda.Universe properties: {u}, {len(u.trajectory)} frames, {u.bonds}, elements: {u.atoms.elements[:10]}, indices: {u.atoms.indices[:10]}\n{trajectory_path}, {topology_path}"
+            f"Trajectory mda.Universe properties: {u}, {len(u.trajectory)} frames, "
+            f"{u.bonds}, elements: {u.atoms.elements[:10]}, "
+            f"indices: {u.atoms.indices[:10]}\n{trajectory_path}, {topology_path}"
         )
 
         se_dir = files.outputdir / "se"
@@ -246,7 +247,7 @@ def make_predictions(
         ys = np.stack(ys)
         ys = np.mean(np.array(ys), 0)
     elif prediction_scheme == "efficient":
-        logger.debug(f"Efficient prediction scheme was chosen.")
+        logger.debug("Efficient prediction scheme was chosen.")
         # hyperparameters
         # offset to lowest barrier, 11RT offset means, the rates
         # are less than one millionth of the highest rate
