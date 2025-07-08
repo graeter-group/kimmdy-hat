@@ -124,9 +124,9 @@ class HAT_reaction(ReactionPlugin):
             u.load_new(trajectory_path.as_posix())
         except ValueError:
             if u.trajectory.n_atoms > len(u.atoms):
-                raise ValueError(f"More atoms in {self.trajectory_format} file than in topology. Check compressed-x-grps is set to 'Protein' in .mdp files.")
+                raise ValueError(f"More atoms in {self.trajectory_format} file than in topology. Check compressed-x-grps is set to the correct group in .mdp files.")
             elif u.trajectory.n_atoms < len(u.atoms):
-                raise ValueError(f"Less atoms in {self.trajectory_format} file than in topology. Check compress-x-grps is set to the correct group.")
+                raise ValueError(f"Less atoms in {self.trajectory_format} file than in topology. Check compressed-x-grps is set to the correct group in .mdp files.")
 
 
         # add necessary attributes
