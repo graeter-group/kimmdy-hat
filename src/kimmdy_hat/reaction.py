@@ -111,23 +111,48 @@ class HAT_reaction(ReactionPlugin):
             logger.debug("Taking trr trajectory for HAT prediction.")
             system_indices = u.atoms.indices
         elif self.trajectory_format == "xtc":
-            protein = u.select_atoms(protein_selection)
             logger.debug("Taking xtc trajectory for HAT prediction.")
-            system_indices = protein.indices
-            u = MDA.Merge(u.select_atoms(protein_selection))
+            for name, mdp in self.runmng.mdps.items():
+                if name + ".mdp" in self.runmng.latest_files.keys():
+                    if group := mdp.get("compressed-x-grps"):
+                        if group.lower() == "protein":
+                            system_indices = u.select_atoms(protein_selection).indices
+                            u = MDA.Merge(u.select_atoms(protein_selection))
+                            logger.debug("Selecting Protein indices")
+                        elif group.lower() == "system":
+                            system_indices = u.atoms.indices
+                            logger.debug("Selecting System indices")
+                        else:
+                            system_indices = u.select_atoms(protein_selection).indices
+                            u = MDA.Merge(u.select_atoms(protein_selection))
+                            logger.debug("Unknown group, selecting protein indices")
+                        break
+                    else:
+                        system_indices = u.atoms.indices
+                        logger.debug(
+                            "compressed-x-grps not defined, selecting system indices"
+                        )
+
         else:
             raise NotImplementedError(
                 f"Can't load trajectory with unknown format: {self.trajectory_format}"
             )
-        
+
         try:
             u.load_new(trajectory_path.as_posix())
         except ValueError:
             if u.trajectory.n_atoms > len(u.atoms):
-                raise ValueError(f"More atoms in {self.trajectory_format} file than in topology. Check compressed-x-grps is set to the correct group in .mdp files.")
+                raise ValueError(
+                    f"More atoms in {self.trajectory_format} file than in "
+                    "topology. Check compressed-x-grps is set to the correct "
+                    "group in .mdp files."
+                )
             elif u.trajectory.n_atoms < len(u.atoms):
-                raise ValueError(f"Less atoms in {self.trajectory_format} file than in topology. Check compressed-x-grps is set to the correct group in .mdp files.")
-
+                raise ValueError(
+                    f"Less atoms in {self.trajectory_format} file than in "
+                    "topology. Check compressed-x-grps is set to the correct "
+                    "group in .mdp files."
+                )
 
         # add necessary attributes
         if not hasattr(u, "elements"):
