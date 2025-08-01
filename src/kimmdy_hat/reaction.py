@@ -9,7 +9,7 @@ from kimmdy_hat.utils.trajectory_utils import (
     extract_subsystems,
 )
 
-from kimmdy_hat.utils.utils import find_radicals
+from kimmdy_hat.utils.utils import find_radicals, free_gpu
 from kimmdy.recipe import Bind, Break, Place, Relax, Recipe, RecipeCollection
 from kimmdy.plugins import ReactionPlugin
 
@@ -22,58 +22,8 @@ from tqdm.autonotebook import tqdm
 
 class HAT_reaction(ReactionPlugin):
     def __init__(self, *args, **kwargs):
-        logging.getLogger("tensorflow").setLevel("CRITICAL")
-        import tensorflow as tf
-
-        logging.getLogger("tensorflow").setLevel("CRITICAL")
-        load_model = tf.keras.models.load_model
 
         super().__init__(*args, **kwargs)
-
-        # Load model
-        if getattr(self.config, "model", None) is None:
-            match self.runmng.config.changer.topology.parameterization:
-                case "basic":
-                    ens_glob = "classic_models"
-                case "grappa":
-                    ens_glob = "grappa_models"
-                case _:
-                    raise RuntimeError(
-                        "Unknown config.changer.topology.parametrization: "
-                        "{config.changer.topology.parametrization}"
-                    )
-        else:
-            ens_glob = self.config.model
-
-        ensemble_dirs = list(res_files("HATmodels").glob(ens_glob + "*"))
-        assert (
-            len(ensemble_dirs) > 0
-        ), f"Model {ens_glob} not found. Please check your config yml."
-        assert (
-            len(ensemble_dirs) == 1
-        ), f"Multiple Models found for {ens_glob}. Please check your config yml."
-        ensemble_dir = ensemble_dirs[0]
-        logging.info(f"Using HAT model: {ensemble_dir.name}")
-        ensemble_size = getattr(self.config, "enseble_size", None)
-        self.models = []
-        self.means = []
-        self.stds = []
-        self.hparas = {}
-        for model_dir in list(ensemble_dir.glob("*"))[slice(ensemble_size)]:
-            tf_model_dir = list(model_dir.glob("*.tf"))[0]
-            self.models.append(load_model(tf_model_dir))
-
-            with open(model_dir / "hparas.json") as f:
-                hpara = json.load(f)
-                self.hparas.update(hpara)
-
-            if hpara.get("scale"):
-                with open(model_dir / "scale", "r") as f:
-                    mean, std = [float(l.strip()) for l in f.readlines()]
-            else:
-                mean, std = [0.0, 1.0]
-            self.means.append(mean)
-            self.stds.append(std)
 
         self.h_cutoff = self.config.h_cutoff
         self.prediction_scheme = self.config.prediction_scheme
@@ -214,17 +164,15 @@ class HAT_reaction(ReactionPlugin):
 
             kwargs = {
                 "se_dir": se_dir,
-                "hparas": self.hparas,
                 "prediction_scheme": self.prediction_scheme,
-                "models": self.models,
-                "means": self.means,
-                "stds": self.stds,
                 "R": self.R,
                 "temperature": self.temperature,
                 "polling_rate": self.polling_rate,
                 "change_coords": self.change_coords,
                 "frequency_factor": self.frequency_factor,
                 "files": files,
+                "config": self.config,
+                "runmng": self.runmng,
                 "logger": logger,
             }
 
@@ -242,23 +190,73 @@ class HAT_reaction(ReactionPlugin):
         return recipe_collection
 
 
+@free_gpu
 def make_predictions(
     u: MDA.Universe,
     se_dir,
-    hparas,
     prediction_scheme,
-    models,
-    means,
-    stds,
     R,
     temperature,
     polling_rate,
     change_coords,
     frequency_factor,
     files,
+    config,
+    runmng,
     logger: logging.Logger = logging.getLogger(__name__),
 ):
     from kimmdy_hat.utils.input_generation import create_meta_dataset_predictions
+
+    logging.getLogger("tensorflow").setLevel("CRITICAL")
+    import tensorflow as tf
+
+    logging.getLogger("tensorflow").setLevel("CRITICAL")
+    load_model = tf.keras.models.load_model
+
+    # Load model
+    if getattr(config, "model", None) is None:
+        match runmng.config.changer.topology.parameterization:
+            case "basic":
+                ens_glob = "classic_models"
+            case "grappa":
+                ens_glob = "grappa_models"
+            case _:
+                raise RuntimeError(
+                    "Unknown config.changer.topology.parametrization: "
+                    "{config.changer.topology.parametrization}"
+                )
+    else:
+        ens_glob = config.model
+
+    ensemble_dirs = list(res_files("HATmodels").glob(ens_glob + "*"))
+    assert (
+        len(ensemble_dirs) > 0
+    ), f"Model {ens_glob} not found. Please check your config yml."
+    assert (
+        len(ensemble_dirs) == 1
+    ), f"Multiple Models found for {ens_glob}. Please check your config yml."
+    ensemble_dir = ensemble_dirs[0]
+    logging.info(f"Using HAT model: {ensemble_dir.name}")
+    ensemble_size = getattr(config, "enseble_size", None)
+    models = []
+    means = []
+    stds = []
+    hparas = {}
+    for model_dir in list(ensemble_dir.glob("*"))[slice(ensemble_size)]:
+        tf_model_dir = list(model_dir.glob("*.tf"))[0]
+        models.append(load_model(tf_model_dir))
+
+        with open(model_dir / "hparas.json") as f:
+            hpara = json.load(f)
+            hparas.update(hpara)
+
+        if hpara.get("scale"):
+            with open(model_dir / "scale", "r") as f:
+                mean, std = [float(l.strip()) for l in f.readlines()]
+        else:
+            mean, std = [0.0, 1.0]
+        means.append(mean)
+        stds.append(std)
 
     # Build input features
     se_npzs = list(se_dir.glob("*.npz"))

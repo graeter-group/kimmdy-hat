@@ -4,6 +4,7 @@ from kimmdy_hat import HAT_reaction
 import pytest
 from pprint import pprint
 import logging
+import subprocess
 
 
 # %%
@@ -139,6 +140,21 @@ def test_traj_to_recipes(recipe_collection):
     for recipe in recipe_collection.recipes:
         assert len(recipe.rates) in [3, 6]
         assert len(recipe.timespans) in [3, 6]
+
+
+@pytest.fixture
+def gpu_info(recipe_collection):
+    gpu_list = subprocess.check_output("nvidia-smi -L", shell=True)
+    gpu_mem = subprocess.check_output(
+        "nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits", shell=True
+    )
+    return [gpu_list.decode("utf-8").rstrip(), int(gpu_mem.decode("utf-8").rstrip())]
+
+
+@pytest.mark.gpu
+def test_gpu_memory_release(gpu_info):
+    assert "GPU" in gpu_info[0]
+    assert gpu_info[1] == 0
 
 
 @pytest.fixture

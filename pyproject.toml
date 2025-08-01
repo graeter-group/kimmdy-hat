@@ -19,7 +19,7 @@ dependencies = [
   "numpy<1.24",
   "kgcnn==2.1.0",
   "MDAnalysis>=2.5.0",
-  "tensorflow<2.16",
+  "tensorflow[and-cuda]<2.16",
   "kimmdy",
 ]
 
