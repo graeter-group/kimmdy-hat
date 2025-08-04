@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.1](https://github.com/graeter-group/kimmdy-hat/compare/v0.1.0...v0.1.1) (2025-08-01)
+
+
+### Bug Fixes
+
+* Catch difference between topology and trajectory ([#34](https://github.com/graeter-group/kimmdy-hat/issues/34)) ([00afcbb](https://github.com/graeter-group/kimmdy-hat/commit/00afcbb7589e6ffd63bd9cbdf0928fbf1148e913))
+* Free GPU memory ([#37](https://github.com/graeter-group/kimmdy-hat/issues/37)) ([f7099bc](https://github.com/graeter-group/kimmdy-hat/commit/f7099bc6bcdce69a0b99cef5aac3c270e0d41189))
+
 ## 0.1.0 (2025-07-07)
 
 
