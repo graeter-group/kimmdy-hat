@@ -41,5 +41,18 @@ include-package-data = true
 where = ["src"]
 namespaces = false
 
+[tool.setuptools.package-data]
+kimmdy_hat = ["*.json"]
+
+[tool.setuptools.exclude-package-data]
+HATmodels = ["*_models"]
+
 [dependency-groups]
-dev = ["pytest", "pytest-cov", "black", "hypothesis", "nglview"]
+dev = [
+  "pytest",
+  "pytest-cov",
+  "pytest-mock",
+  "black",
+  "hypothesis",
+  "nglview"
+]
