@@ -28,9 +28,9 @@ def download_models(target_dir):
     for model in MODELS:
         model_paths.extend(list(unzipped.glob(f"**/{model}")))
 
-    assert len(MODELS) == len(model_paths), (
-        f"Not all models could be downloaded, found: {model_paths}"
-    )
+    assert len(MODELS) == len(
+        model_paths
+    ), f"Not all models could be downloaded, found: {model_paths}"
 
     for model in model_paths:
         logger.debug(f"Copy {model.name} to {target_dir}")
