@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0](https://github.com/graeter-group/kimmdy-hat/compare/v0.1.1...v0.2.0) (2025-08-06)
+
+
+### Features
+
+* download models from github ([#38](https://github.com/graeter-group/kimmdy-hat/issues/38)) ([856f137](https://github.com/graeter-group/kimmdy-hat/commit/856f137d65119446bce8cc504d376703ed84d1a5))
+
 ## [0.1.1](https://github.com/graeter-group/kimmdy-hat/compare/v0.1.0...v0.1.1) (2025-08-01)
 
 
