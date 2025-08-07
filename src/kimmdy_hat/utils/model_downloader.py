@@ -1,4 +1,6 @@
 import logging
+import certifi
+import ssl
 from urllib.request import urlretrieve
 from pathlib import Path
 from shutil import copytree, rmtree
@@ -15,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 def download_models(target_dir):
     logger.info("Starting to download HAT prediction models..")
+    context = ssl.create_default_context(cafile=certifi.where())
     tmp_path, header = urlretrieve(URL)
     tmp_path = Path(tmp_path)
     logger.info("Download finished!")

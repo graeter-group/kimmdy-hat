@@ -21,6 +21,7 @@ dependencies = [
   "MDAnalysis>=2.5.0",
   "tensorflow[and-cuda]<2.16",
   "kimmdy",
+  "certifi>=2025.6.15",
 ]
 
 [project.readme]
