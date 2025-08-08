@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "kimmdy-hat"
-version = "0.1.1"
+version = "0.2.0"
 license = "GPL-3.0-or-later"
 license-files = ["LICEN[CS]E*"]
 description = "Hydrogen Atom Transfer Plugin for KIMMDY"
@@ -41,5 +41,18 @@ include-package-data = true
 where = ["src"]
 namespaces = false
 
+[tool.setuptools.package-data]
+kimmdy_hat = ["*.json"]
+
+[tool.setuptools.exclude-package-data]
+HATmodels = ["*_models"]
+
 [dependency-groups]
-dev = ["pytest", "pytest-cov", "black", "hypothesis", "nglview"]
+dev = [
+  "pytest",
+  "pytest-cov",
+  "pytest-mock",
+  "black",
+  "hypothesis",
+  "nglview"
+]
