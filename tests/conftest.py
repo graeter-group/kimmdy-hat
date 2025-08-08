@@ -21,8 +21,6 @@ def arranged_tmp_path(tmp_path: Path, request: pytest.FixtureRequest):
 
     With files for the test and a symlink to forcefield.
     """
-    if str(request.config.rootdir)[-6:] != "kimmdy":
-        return 0
 
     # if fixture was parameterized, use this for directory with input files
     if hasattr(request, "param"):
