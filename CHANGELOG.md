@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/graeter-group/kimmdy-hat/compare/v0.2.0...v0.2.1) (2025-08-11)
+
+
+### Bug Fixes
+
+* ssl issue ([#40](https://github.com/graeter-group/kimmdy-hat/issues/40)) ([34cd7bd](https://github.com/graeter-group/kimmdy-hat/commit/34cd7bde2f795ffbdacfe009a8cf5346e3c99886))
+
 ## [0.2.0](https://github.com/graeter-group/kimmdy-hat/compare/v0.1.1...v0.2.0) (2025-08-06)
 
 
