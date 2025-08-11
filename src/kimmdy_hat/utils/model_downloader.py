@@ -1,10 +1,11 @@
 import logging
 import certifi
 import ssl
-from urllib.request import urlretrieve
+from urllib import request
 from pathlib import Path
-from shutil import copytree, rmtree
+from shutil import copytree
 import zipfile
+import tempfile
 
 
 URL = "https://github.com/graeter-group/kimmdy-hat/archive/refs/tags/v0.1.1.zip"
@@ -16,31 +17,37 @@ logger = logging.getLogger(__name__)
 
 
 def download_models(target_dir):
-    logger.info("Starting to download HAT prediction models..")
+    print("Starting to download HAT prediction models..", end="")
     context = ssl.create_default_context(cafile=certifi.where())
-    tmp_path, header = urlretrieve(URL)
-    tmp_path = Path(tmp_path)
-    logger.info("Download finished!")
-    logger.debug(f"Zip archive: {tmp_path}")
 
-    unzipped = tmp_path.parent / "HATmodels"
-    with zipfile.ZipFile(tmp_path, "r") as zip_f:
-        zip_f.extractall(unzipped)
+    url = request.urlopen(URL, context=context)
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        zipped = Path(tmp_dir) / "kimmdy_hat.zip"
+        unzipped = Path(tmp_dir) / "kimmdy_hat"
 
-    model_paths = []
-    for model in MODELS:
-        model_paths.extend(list(unzipped.glob(f"**/{model}")))
+        with open(zipped, "b+w") as fp:
+            fp.write(url.read())
 
-    assert len(MODELS) == len(
-        model_paths
-    ), f"Not all models could be downloaded, found: {model_paths}"
+        with zipfile.ZipFile(zipped, "r") as zip_f:
+            zip_f.extractall(unzipped)
 
-    for model in model_paths:
-        logger.debug(f"Copy {model.name} to {target_dir}")
-        copytree(model, target_dir / model.name)
+        model_paths = []
+        for model in MODELS:
+            model_paths.extend(list(unzipped.glob(f"**/{model}")))
 
-    tmp_path.unlink()
-    rmtree(unzipped)
+        assert len(MODELS) == len(model_paths), (
+            f"Not all models could be downloaded, found: {model_paths}"
+        )
+
+        for model in model_paths:
+            if (target_dir / model.name).exists():
+                logger.debug(f"{model.name} exists already.")
+                continue
+            logger.debug(f"Copy {model.name} to {target_dir}")
+            copytree(model, target_dir / model.name)
+
+        print(" Done!")
+
     logger.debug("Removed downloads")
 
 
@@ -49,12 +56,12 @@ def ensure_models_exist():
     existing = [(models_path / m).exists() for m in MODELS]
     download = False
     if all(existing):
-        logger.info("Found all expected HAT models.")
+        logging.debug("Found all expected HAT models.")
     elif any(existing):
-        logger.info("HAT Models download not complete.")
+        print("HAT Models download not complete.")
         download = True
     else:
-        logger.info("HAT models not downloaded yet.")
+        print("HAT models not downloaded yet.")
         download = True
 
     if download:
