@@ -14,6 +14,7 @@ from kimmdy.plugins import discover_plugins
 from kimmdy.tasks import TaskFiles
 from kimmdy.utils import get_gmx_dir
 
+
 ## fixtures for setup and teardown ##
 @pytest.fixture
 def arranged_tmp_path(tmp_path: Path, request: pytest.FixtureRequest):
@@ -29,10 +30,10 @@ def arranged_tmp_path(tmp_path: Path, request: pytest.FixtureRequest):
     else:
         file_dir = Path(__file__).parent / request.path.stem
     # arrange tmp_path
-    
+
     shutil.copytree(file_dir, tmp_path, dirs_exist_ok=True)
     assetsdir = Path(__file__).parent / "assets"
-        
+
     if not (tmp_path / "amber99sb-star-ildnp.ff").exists():
         Path(tmp_path / "amber99sb-star-ildnp.ff").symlink_to(
             assetsdir / "amber99sb-star-ildnp.ff",
@@ -41,6 +42,7 @@ def arranged_tmp_path(tmp_path: Path, request: pytest.FixtureRequest):
     # change cwd to tmp_path
     os.chdir(tmp_path.resolve())
     return tmp_path
+
 
 # Functions for parsing --gpu to enable gpu teest
 def pytest_addoption(parser):
