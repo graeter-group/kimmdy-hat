@@ -26,9 +26,9 @@ def read_last_line(file):
 )
 @pytest.mark.slow
 def test_integration_hat_reaction(arranged_tmp_path,request):
-    print(str(request.config.rootdir))
-    if str(request.config.rootdir)[-6:] != "kimmdy":
-        pytest.skip(reason="Pytest not executed from KIMMDY directory.")
+    #print(str(request.config.rootdir))
+    #if str(request.config.rootdir)[-6:] != "kimmdy":
+    #    pytest.skip(reason="Pytest not executed from KIMMDY directory.")
 
     kimmdy_run()
     assert "Finished running last task" in read_last_line(
