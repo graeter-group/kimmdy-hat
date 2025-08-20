@@ -61,7 +61,7 @@ torchvision = [
 
 [[tool.uv.index]]
 name = "pytorch-cpu"
-url = "https://download.pytorch.org/wh1/cpu"
+url = "https://download.pytorch.org/whl/cpu"
 explicit = true
 
 [dependency-groups]
