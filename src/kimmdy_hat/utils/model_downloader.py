@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 def download_models(target_dir):
-    print("Starting to download HAT prediction models..", end="")
+    print("Starting to download HAT prediction models..", end="", flush=True)
     context = ssl.create_default_context(cafile=certifi.where())
 
     url = request.urlopen(URL, context=context)
