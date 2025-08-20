@@ -34,6 +34,9 @@ hat_reaction = "kimmdy_hat.reaction:HAT_reaction"
 [project.scripts]
 HAT_reaction = "kimmdy.cmd:kimmdy"
 
+[project.optional-dependencies]
+grappa = ["kimmdy-grappa", "grappa-ff", "torch"]
+
 [tool.setuptools]
 package-dir = { "" = "src" }
 include-package-data = true
