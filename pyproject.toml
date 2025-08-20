@@ -51,6 +51,19 @@ kimmdy_hat = ["*.json"]
 [tool.setuptools.exclude-package-data]
 HATmodels = ["*_models"]
 
+[tool.uv.sources]
+torch = [
+  { index = "pytorch-cpu" },
+]
+torchvision = [
+  { index = "pytorch-cpu" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/wh1/cpu"
+explicit = true
+
 [dependency-groups]
 dev = [
   "pytest",
