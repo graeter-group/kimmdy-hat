@@ -24,7 +24,6 @@ def read_last_line(file):
 
 
 @pytest.mark.parametrize("arranged_tmp_path", (["test_hat_integration"]), indirect=True)
-@pytest.mark.slow
 def test_integration_hat_reaction(arranged_tmp_path):
 
     kimmdy_run()
