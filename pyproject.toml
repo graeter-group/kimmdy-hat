@@ -34,6 +34,9 @@ hat_reaction = "kimmdy_hat.reaction:HAT_reaction"
 [project.scripts]
 HAT_reaction = "kimmdy.cmd:kimmdy"
 
+[project.optional-dependencies]
+grappa = ["kimmdy-grappa", "grappa-ff", "torch"]
+
 [tool.setuptools]
 package-dir = { "" = "src" }
 include-package-data = true
@@ -47,6 +50,19 @@ kimmdy_hat = ["*.json"]
 
 [tool.setuptools.exclude-package-data]
 HATmodels = ["*_models"]
+
+[tool.uv.sources]
+torch = [
+  { index = "pytorch-cpu" },
+]
+torchvision = [
+  { index = "pytorch-cpu" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
 
 [dependency-groups]
 dev = [
