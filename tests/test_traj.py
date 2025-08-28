@@ -13,7 +13,6 @@ class DummyClass:
 
 
 class DummyRunmanager:
-
     def __init__(self):
         self.config = DummyClass()
         self.config.reactions = DummyClass()
@@ -145,16 +144,17 @@ def test_traj_to_recipes(recipe_collection):
 @pytest.fixture
 def gpu_info(recipe_collection):
     gpu_list = subprocess.check_output("nvidia-smi -L", shell=True)
-    gpu_mem = subprocess.check_output(
-        "nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits", shell=True
+    gpu_names = subprocess.check_output(
+        "nvidia-smi --query-compute-apps=name --format=csv,noheader,nounits",
+        shell=True,
     )
-    return [gpu_list.decode("utf-8").rstrip(), int(gpu_mem.decode("utf-8").rstrip())]
+    return [gpu_list.decode("utf-8").rstrip(), (gpu_names.decode("utf-8"))]
 
 
 @pytest.mark.gpu
 def test_gpu_memory_release(gpu_info):
     assert "GPU" in gpu_info[0]
-    assert gpu_info[1] == 0
+    assert len(gpu_info[1]) == 0
 
 
 @pytest.fixture
