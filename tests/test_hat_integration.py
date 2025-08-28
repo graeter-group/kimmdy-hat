@@ -34,6 +34,7 @@ def test_integration_hat_reaction(arranged_tmp_path):
         len(list(Path.cwd().glob("alanine_hat_000/*"))) == 14
     )  # don't forget, .kimmdy_finished counts
 
+
 @pytest.mark.parametrize("arranged_tmp_path", (["test_hat_integration"]), indirect=True)
 def test_integration_hat_restart(arranged_tmp_path):
     run_dir = Path("alanine_hat_000")
@@ -49,7 +50,7 @@ def test_integration_hat_restart(arranged_tmp_path):
     (task_dirs[-1] / MARK_DONE).unlink()
     (arranged_tmp_path / run_dir / MARK_FINISHED).unlink()
     kimmdy_run(input=Path("kimmdy_restart.yml"))
-    n_files_continue_md = len(list(run_dir.glob("*"))) 
+    n_files_continue_md = len(list(run_dir.glob("*")))
 
     assert "Finished running last task" in read_last_line(
         Path("alanine_hat_000.kimmdy.log")
@@ -63,7 +64,7 @@ def test_integration_hat_restart(arranged_tmp_path):
     kimmdy_run(input=Path("kimmdy_restart.yml"))
     n_files_restart = len(list(run_dir.glob("*")))
 
-    assert "Finished running last task" in  read_last_line(
+    assert "Finished running last task" in read_last_line(
         Path("alanine_hat_000.kimmdy.log")
     )
     assert n_files_original == n_files_restart == 15
