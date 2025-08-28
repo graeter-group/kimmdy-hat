@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.0.0](https://github.com/graeter-group/kimmdy-hat/compare/v0.2.1...v1.0.0) (2025-08-28)
+
+
+### ⚠ BREAKING CHANGES
+
+* bump version to 1.0.0
+
+### Features
+
+* bump version to 1.0.0 ([0fbb573](https://github.com/graeter-group/kimmdy-hat/commit/0fbb573ffae2db0fceffcda8f3bc07fa8480bd4b))
+* Integration test for plugin with KIMMDY ([#42](https://github.com/graeter-group/kimmdy-hat/issues/42)) ([31a305e](https://github.com/graeter-group/kimmdy-hat/commit/31a305e18e00a7c0c358090e4c934614e552f934))
+
+
+### Bug Fixes
+
+* flush print before downloading models ([6ee35ef](https://github.com/graeter-group/kimmdy-hat/commit/6ee35ef25fc7133247c0684714f020ce9419afa5))
+* test gpu compute apps instead of memory ([e62f852](https://github.com/graeter-group/kimmdy-hat/commit/e62f852f601c49852777ac1704778f68880da00c))
+* update gitignore ([e866736](https://github.com/graeter-group/kimmdy-hat/commit/e866736c8acbe38314c4e95335992e8810d06f21))
+
 ## [0.2.1](https://github.com/graeter-group/kimmdy-hat/compare/v0.2.0...v0.2.1) (2025-08-11)
 
 
