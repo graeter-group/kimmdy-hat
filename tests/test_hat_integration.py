@@ -1,14 +1,8 @@
 import os
-import subprocess as sp
 from pathlib import Path
-
-import pytest
 
 from kimmdy.cmd import kimmdy_run
 from kimmdy.constants import MARK_DONE, MARK_FINISHED
-from kimmdy.parsing import read_top, write_top
-from kimmdy.plugins import parameterization_plugins
-from kimmdy.topology.topology import Topology
 from kimmdy.utils import get_task_directories
 
 
@@ -23,13 +17,45 @@ def read_last_line(file):
         return f.readline().decode()
 
 
-@pytest.mark.parametrize("arranged_tmp_path", (["test_hat_integration"]), indirect=True)
 def test_integration_hat_reaction(arranged_tmp_path):
-
     kimmdy_run()
     assert "Finished running last task" in read_last_line(
         Path("alanine_hat_000.kimmdy.log")
     )
     assert (
-        len(list(Path.cwd().glob("alanine_hat_000/*"))) == 22
+        len(list(Path.cwd().glob("alanine_hat_000/*"))) == 14
     )  # don't forget, .kimmdy_finished counts
+
+
+def test_integration_hat_restart(arranged_tmp_path):
+    run_dir = Path("alanine_hat_000")
+    kimmdy_run(input=Path("kimmdy_restart.yml"))
+    n_files_original = len(list(run_dir.glob("*")))
+
+    # restart already finished run
+    kimmdy_run(input=Path("kimmdy_restart.yml"))
+    assert "already finished" in read_last_line(Path("alanine_hat_000.kimmdy.log"))
+
+    # try restart from stopped md
+    task_dirs = get_task_directories(run_dir)
+    (task_dirs[-1] / MARK_DONE).unlink()
+    (arranged_tmp_path / run_dir / MARK_FINISHED).unlink()
+    kimmdy_run(input=Path("kimmdy_restart.yml"))
+    n_files_continue_md = len(list(run_dir.glob("*")))
+
+    assert "Finished running last task" in read_last_line(
+        Path("alanine_hat_000.kimmdy.log")
+    )
+    assert n_files_original == n_files_continue_md == 15
+
+    # try restart from finished md
+    task_dirs = get_task_directories(run_dir)
+    (task_dirs[-4] / MARK_DONE).unlink()
+    (arranged_tmp_path / run_dir / MARK_FINISHED).unlink()
+    kimmdy_run(input=Path("kimmdy_restart.yml"))
+    n_files_restart = len(list(run_dir.glob("*")))
+
+    assert "Finished running last task" in read_last_line(
+        Path("alanine_hat_000.kimmdy.log")
+    )
+    assert n_files_original == n_files_restart == 15

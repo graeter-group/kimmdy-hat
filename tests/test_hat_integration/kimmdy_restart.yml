@@ -6,6 +6,7 @@ ff: "amber99sb-star-ildnp.ff" # optional, dir endinng with .ff by default
 top: "Ala_out.top"
 gro: "npt.gro"
 ndx: "index.ndx"
+restart: true
 tau_scale: 1e-9
 mds:
   equilibrium:
@@ -32,3 +33,4 @@ sequence:
     tasks:
       - reactions
       - equilibrium
+  - equilibrium
