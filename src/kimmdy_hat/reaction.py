@@ -1,3 +1,6 @@
+from functools import partial
+from multiprocessing import Pool
+from time import time, sleep
 import json
 from importlib.resources import files as res_files
 import logging
@@ -22,7 +25,6 @@ from tqdm.autonotebook import tqdm
 
 class HAT_reaction(ReactionPlugin):
     def __init__(self, *args, **kwargs):
-
         super().__init__(*args, **kwargs)
 
         self.h_cutoff = self.config.h_cutoff
@@ -190,7 +192,6 @@ class HAT_reaction(ReactionPlugin):
         return recipe_collection
 
 
-@free_gpu
 def make_predictions(
     u: MDA.Universe,
     se_dir,
@@ -205,15 +206,6 @@ def make_predictions(
     runmng,
     logger: logging.Logger = logging.getLogger(__name__),
 ):
-    from kimmdy_hat.utils.input_generation import create_meta_dataset_predictions
-
-    logging.getLogger("tensorflow").setLevel("CRITICAL")
-    import tensorflow as tf
-
-    logging.getLogger("tensorflow").setLevel("CRITICAL")
-    load_model = tf.keras.models.load_model
-
-    # Load model
     if getattr(config, "model", None) is None:
         match runmng.config.changer.topology.parameterization:
             case "basic":
@@ -229,94 +221,31 @@ def make_predictions(
         ens_glob = config.model
 
     ensemble_dirs = list(res_files("HATmodels").glob(ens_glob + "*"))
-    assert (
-        len(ensemble_dirs) > 0
-    ), f"Model {ens_glob} not found. Please check your config yml."
-    assert (
-        len(ensemble_dirs) == 1
-    ), f"Multiple Models found for {ens_glob}. Please check your config yml."
+    assert len(ensemble_dirs) > 0, (
+        f"Model {ens_glob} not found. Please check your config yml."
+    )
+    assert len(ensemble_dirs) == 1, (
+        f"Multiple Models found for {ens_glob}. Please check your config yml."
+    )
     ensemble_dir = ensemble_dirs[0]
     logging.info(f"Using HAT model: {ensemble_dir.name}")
     ensemble_size = getattr(config, "enseble_size", None)
-    models = []
-    means = []
-    stds = []
-    hparas = {}
-    for model_dir in list(ensemble_dir.glob("*"))[slice(ensemble_size)]:
-        tf_model_dir = list(model_dir.glob("*.tf"))[0]
-        models.append(load_model(tf_model_dir))
 
-        with open(model_dir / "hparas.json") as f:
-            hpara = json.load(f)
-            hparas.update(hpara)
-
-        if hpara.get("scale"):
-            with open(model_dir / "scale", "r") as f:
-                mean, std = [float(l.strip()) for l in f.readlines()]
-        else:
-            mean, std = [0.0, 1.0]
-        means.append(mean)
-        stds.append(std)
-
-    # Build input features
     se_npzs = list(se_dir.glob("*.npz"))
-    in_ds, es, scale_t, meta_ds, metas_masked = create_meta_dataset_predictions(
-        meta_files=se_npzs,
-        batch_size=hparas["batchsize"],
-        mask_energy=False,
-        oneway=True,
-    )
-    assert len(in_ds) > 0, "Empty dataset!"
+    model_dirs = list(ensemble_dir.glob("*"))[slice(ensemble_size)]
 
-    # Make predictions
-    logger.info("Making predictions.")
-    if prediction_scheme == "all_models":
+    t = time()
+    with Pool(10) as p:
         ys = []
-        for model, m, s in zip(models, means, stds):
-            y = model.predict(in_ds).reshape(-1)
-            ys.append((y * s) + m)
-        ys = np.stack(ys)
-        ys = np.mean(np.array(ys), 0)
-    elif prediction_scheme == "efficient":
-        logger.debug("Efficient prediction scheme was chosen.")
-        # hyperparameters
-        # offset to lowest barrier, 11RT offset means, the rates
-        # are less than one millionth of the highest rate
-        required_offset = 11 / (R * temperature)
-        uncertainty = 3.5  # kcal/mol; expected error to QM of a single model prediction
-        # single prediction
-        model, m, s = next(zip(models, means, stds))
-        ys_single = model.predict(in_ds).reshape(-1)
-        # find where to recalculate with full ensemble (low barriers)
-        recalculate = ys_single <= (ys_single.min() + required_offset + uncertainty)
-        # build reduced dataset
-        meta_files_recalculate = [
-            s for s, r in zip(list(se_dir.glob("*.npz")), recalculate) if r
-        ]
-        in_ds_ensemble, _, _, _, _ = create_meta_dataset_predictions(
-            meta_files=meta_files_recalculate,
-            batch_size=hparas["batchsize"],
-            mask_energy=False,
-            oneway=True,
-        )
-        # ensemble prediction
-        ys_ensemble = []
-        for model, m, s in zip(models, means, stds):
-            y_ensemble = model.predict(in_ds_ensemble).reshape(-1)
-            ys_ensemble.append((y_ensemble * s) + m)
-        ys_ensemble = np.stack(ys_ensemble)
-        ys_ensemble = np.mean(np.array(ys_ensemble), 0)
-        ys_full_iter = iter(ys_ensemble)
-        # take ensemble prediction value where there was a recaulcation,
-        # else y_single
-        ys = np.asarray(
-            [
-                y_single if not r else next(ys_full_iter)
-                for y_single, r in zip(ys_single, recalculate)
-            ]
-        )
-    else:
-        raise ValueError(f"Unknown prediction scheme: {prediction_scheme}")
+        meta_ds = []
+        results = p.map(partial(_make_predictions, se_npzs=se_npzs), model_dirs)
+        for y, meta_d, mean, std in results:
+            ys.append((y * std) + mean)
+            meta_ds.append(meta_d[0])
+    logger.info(f"Prediction time: {time() - t}")
+
+    ys = np.stack(ys)
+    ys = np.mean(np.array(ys), 0)
 
     # Rate; RT=0.593 kcal/mol
     logger.info("Creating Recipes.")
@@ -389,3 +318,73 @@ def make_predictions(
         recipes.append(Recipe(recipe_steps=seq, rates=[rate], timespans=[[t1, t2]]))
 
     return RecipeCollection(recipes)
+
+
+def _load_ds(model_dir: Path, se_npzs):
+    from kimmdy_hat.utils.input_generation import create_meta_dataset_predictions
+
+    with open(model_dir / "hparas.json") as f:
+        hpara = json.load(f)
+
+    if hpara.get("scale"):
+        with open(model_dir / "scale", "r") as f:
+            mean, std = [float(l.strip()) for l in f.readlines()]
+    else:
+        mean, std = [0.0, 1.0]
+
+    # Build input features
+    in_ds, es, scale_t, meta_ds, metas_masked = create_meta_dataset_predictions(
+        meta_files=se_npzs,
+        batch_size=hpara["batchsize"],
+        mask_energy=False,
+        oneway=True,
+    )
+    assert len(in_ds) > 0, "Empty dataset!"
+
+    return in_ds, mean, std, meta_ds
+
+
+def _make_predictions(model_dir, se_npzs):
+    logging.getLogger("tensorflow").setLevel("CRITICAL")
+    import tensorflow as tf
+
+    # set memory growth
+    gpus = tf.config.list_physical_devices("GPU")
+    if gpus:
+        try:
+            # Currently, memory growth needs to be the same across GPUs
+            for gpu in gpus:
+                tf.config.experimental.set_memory_growth(gpu, True)
+                logical_gpus = tf.config.list_logical_devices("GPU")
+                print(len(gpus), "Physical GPUs,", len(logical_gpus), "Logical GPUs")
+        except RuntimeError as e:
+            # Memory growth must be set before GPUs have been initialized
+            print(e)
+
+    logging.getLogger("tensorflow").setLevel("CRITICAL")
+    load_model = tf.keras.models.load_model
+    tf_model_dir = list(model_dir.glob("*.tf"))[0]
+
+    done = False
+    i = 0
+    while not done and i < 2:
+        i += 1
+        try:
+            model = load_model(tf_model_dir)
+            in_ds, mean, std, meta_ds = _load_ds(model_dir, se_npzs)
+            y = model.predict(in_ds).reshape(-1)
+            done = True
+        except Exception as e:
+            logging.error("OOM on GPU, trying inference on CPU")
+            with tf.device("cpu:0"):
+                model = load_model(tf_model_dir)
+                in_ds, mean, std, meta_ds = _load_ds(model_dir, se_npzs)
+                y = model.predict(in_ds).reshape(-1)
+                done = True
+
+    if not done:
+        m = "Error during hat prediction!\n"
+        m += "Done retrying, exiting.."
+        raise RuntimeError(m)
+
+    return y, meta_ds, mean, std
