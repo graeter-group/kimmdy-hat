@@ -1,6 +1,6 @@
 import MDAnalysis as mda
 import numpy as np
-from multiprocessing import Manager, Process, Queue
+from multiprocessing import Process, Queue
 
 
 def find_radicals(u):
