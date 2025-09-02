@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/graeter-group/kimmdy-hat/compare/v1.1.0...v1.2.0) (2025-09-02)
+
+
+### Features
+
+* predict on all models in parallel ([#46](https://github.com/graeter-group/kimmdy-hat/issues/46)) ([da001a5](https://github.com/graeter-group/kimmdy-hat/commit/da001a5a42980589f99f7a7983cfe19fe0dbcd65))
+
 ## [1.1.0](https://github.com/graeter-group/kimmdy-hat/compare/v1.0.0...v1.1.0) (2025-09-02)
 
 
