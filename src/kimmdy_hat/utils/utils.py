@@ -142,8 +142,8 @@ def free_gpu(func):
         q = Queue(1)
         p = Process(target=_queue_helper, args=(func, q, *args), kwargs=kwargs)
         p.start()
+        res = q.get()
         p.join()
-        res = q.get(block=True, timeout=100)
         p.close()
         q.close()
         return res

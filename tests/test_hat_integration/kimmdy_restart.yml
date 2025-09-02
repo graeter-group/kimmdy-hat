@@ -6,10 +6,11 @@ ff: "amber99sb-star-ildnp.ff" # optional, dir endinng with .ff by default
 top: "Ala_out.top"
 gro: "npt.gro"
 ndx: "index.ndx"
+restart: true
 tau_scale: 1e-9
 mds:
   equilibrium:
-    mdp: "md.mdp"
+    mdp: "md_short.mdp"
 changer:
   topology:
     parameterization: grappa
@@ -24,10 +25,12 @@ reactions:
     polling_rate: 1
     change_coords: "place"
     keep_structures: true
-    n_unique: 0
+    n_unique: 10
 
 sequence:
   - equilibrium
   - mult: 2
     tasks:
       - reactions
+      - equilibrium
+  - equilibrium
