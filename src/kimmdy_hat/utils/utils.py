@@ -1,6 +1,6 @@
 import MDAnalysis as mda
 import numpy as np
-from multiprocessing import Process, Queue
+from multiprocessing import Manager, Process, Queue
 
 
 def find_radicals(u):
@@ -138,13 +138,12 @@ def _queue_helper(func, q, *args, **kwargs):
 
 
 def free_gpu(func):
-
     def wrapper(*args, **kwargs):
         q = Queue(1)
         p = Process(target=_queue_helper, args=(func, q, *args), kwargs=kwargs)
         p.start()
+        res = q.get()
         p.join()
-        res = q.get(block=True, timeout=100)
         p.close()
         q.close()
         return res
