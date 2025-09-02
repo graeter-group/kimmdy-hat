@@ -13,7 +13,6 @@ from kimmdy_hat.utils.utils import find_radicals, free_gpu
 from kimmdy.recipe import Bind, Break, Place, Relax, Recipe, RecipeCollection
 from kimmdy.plugins import ReactionPlugin
 
-from pprint import pformat
 from tempfile import TemporaryDirectory
 import shutil
 from pathlib import Path
@@ -22,7 +21,6 @@ from tqdm.autonotebook import tqdm
 
 class HAT_reaction(ReactionPlugin):
     def __init__(self, *args, **kwargs):
-
         super().__init__(*args, **kwargs)
 
         self.h_cutoff = self.config.h_cutoff
@@ -229,12 +227,12 @@ def make_predictions(
         ens_glob = config.model
 
     ensemble_dirs = list(res_files("HATmodels").glob(ens_glob + "*"))
-    assert (
-        len(ensemble_dirs) > 0
-    ), f"Model {ens_glob} not found. Please check your config yml."
-    assert (
-        len(ensemble_dirs) == 1
-    ), f"Multiple Models found for {ens_glob}. Please check your config yml."
+    assert len(ensemble_dirs) > 0, (
+        f"Model {ens_glob} not found. Please check your config yml."
+    )
+    assert len(ensemble_dirs) == 1, (
+        f"Multiple Models found for {ens_glob}. Please check your config yml."
+    )
     ensemble_dir = ensemble_dirs[0]
     logging.info(f"Using HAT model: {ensemble_dir.name}")
     ensemble_size = getattr(config, "enseble_size", None)
@@ -270,13 +268,38 @@ def make_predictions(
 
     # Make predictions
     logger.info("Making predictions.")
+
+    # sequentially predict all models
     if prediction_scheme == "all_models":
         ys = []
+
         for model, m, s in zip(models, means, stds):
             y = model.predict(in_ds).reshape(-1)
             ys.append((y * s) + m)
         ys = np.stack(ys)
         ys = np.mean(np.array(ys), 0)
+
+    # merge all models into one
+    elif prediction_scheme == "parallel":
+        inputs = []
+        for inp in models[0].inputs:
+            inputs.append(
+                tf.keras.layers.Input(shape=inp.shape[1:], dtype=inp.dtype, ragged=True)
+            )
+        # make names unique
+        for i, model in enumerate(models):
+            model._name = model.name + f"_{i}"
+
+        outputs = []
+        for model, m, s in zip(models, means, stds):
+            outputs.append((model(inputs) * s) + m)
+
+        combi_model = tf.keras.Model(inputs, outputs)
+        ys = combi_model.predict(in_ds)
+        ys = np.stack(ys)
+        ys = np.mean(np.array(ys), 0).reshape(-1)
+
+    # run one model, then repeat lowest barrier structures
     elif prediction_scheme == "efficient":
         logger.debug("Efficient prediction scheme was chosen.")
         # hyperparameters
