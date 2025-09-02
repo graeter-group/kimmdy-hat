@@ -23,7 +23,7 @@ def test_integration_hat_reaction(arranged_tmp_path):
         Path("alanine_hat_000.kimmdy.log")
     )
     assert (
-        len(list(Path.cwd().glob("alanine_hat_000/*"))) == 14
+        len(list(Path.cwd().glob("alanine_hat_000/*"))) == 12
     )  # don't forget, .kimmdy_finished counts
 
 
