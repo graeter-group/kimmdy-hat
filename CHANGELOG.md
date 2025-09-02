@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.1.0](https://github.com/graeter-group/kimmdy-hat/compare/v1.0.0...v1.1.0) (2025-09-02)
+
+
+### Features
+
+* integration tests for restarting ([#44](https://github.com/graeter-group/kimmdy-hat/issues/44)) ([53eb87d](https://github.com/graeter-group/kimmdy-hat/commit/53eb87d00a470b1841b859eedb4fecdcc872e82d))
+
+
+### Bug Fixes
+
+* deadlock while reading queue ([#47](https://github.com/graeter-group/kimmdy-hat/issues/47)) ([2cc2560](https://github.com/graeter-group/kimmdy-hat/commit/2cc2560685eadd26209156ce3cbc7ef7d7660317))
+
 ## [1.0.0](https://github.com/graeter-group/kimmdy-hat/compare/v0.2.1...v1.0.0) (2025-08-28)
 
 
