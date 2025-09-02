@@ -138,7 +138,6 @@ def _queue_helper(func, q, *args, **kwargs):
 
 
 def free_gpu(func):
-
     def wrapper(*args, **kwargs):
         q = Queue(1)
         p = Process(target=_queue_helper, args=(func, q, *args), kwargs=kwargs)

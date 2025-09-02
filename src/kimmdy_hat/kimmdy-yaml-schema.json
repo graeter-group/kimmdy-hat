@@ -1,111 +1,133 @@
 {
-    "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "type": "object",
-    "$id": "hat_reaction-config",
-    "description": "Settings for HAT reaction plugin",
-    "additionalProperties": false,
-    "properties": {
-      "arrhenius_equation": {
-        "title": "arrhenius_equation",
-        "type": "object",
-        "description": "For setting values in the arrhenius equation",
-        "properties": {
-          "frequency_factor": {
-            "type": "float",
-            "description": "Frequency factor",
-            "pytype": "float",
-            "minimum": 0,
-            "default": 0.288
-          },
-          "temperature": {
-            "type": "float",
-            "description": "Temperature",
-            "pytype": "float",
-            "minimum": 0,
-            "default": 300
-          }       
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "$id": "hat_reaction-config",
+  "description": "Settings for HAT reaction plugin",
+  "additionalProperties": false,
+  "properties": {
+    "arrhenius_equation": {
+      "title": "arrhenius_equation",
+      "type": "object",
+      "description": "For setting values in the arrhenius equation",
+      "properties": {
+        "frequency_factor": {
+          "type": "float",
+          "description": "Frequency factor",
+          "pytype": "float",
+          "minimum": 0,
+          "default": 0.288
         },
-        "required": [ "frequency_factor", "temperature" ],
-        "additionalProperties": false
+        "temperature": {
+          "type": "float",
+          "description": "Temperature",
+          "pytype": "float",
+          "minimum": 0,
+          "default": 300
+        }
       },
-      "h_cutoff": {
-        "type": "float",
-        "description": "Cutoff for H atom",
-        "pytype": "float",
-        "default": 3
-      },
-      "cap": {
-        "type": "boolean",
-        "description": "If true, cap structures for prediction. Default False.",
-        "pytype": "bool",
-        "default": false
-      },
-      "model": {
-        "type": "string",
-        "description": "Model name, optional. If not defined, will choose based on grappa usage in KIMMDY.",
-        "pytype": "str",
-        "enum": ["grappa", "classic"],
-        "default": null
-      },
-      "ensemble_size": {
-        "type": "integer",
-        "description": "Number of models to use, defaults to all, optional",
-        "pytype": "int",
-        "default": null
-      },
-      "prediction_scheme": {
-        "type": "string",
-        "description": "How to predict the reaction barrier. Current options: `efficient`, `all_models`. `efficient` first predicts the barriers with one model, and if a barrier is sufficiently low, recalculates it with the complete ensemble. In the `all_models` scheme, for all reactions the whole ensemble prediction is used. Default: `efficient`",
-        "pytype": "str",
-        "enum": ["all_models", "efficient"],
-        "default": "efficient"
-      },
-      "polling_rate": {
-        "type": "integer",
-        "description": "Polling rate, defaults to 10",
-        "pytype": "int",
-        "default": 10
-      },
-      "n_unique": {
-        "type": "integer",
-        "description": "Only consider the n frames per reaction with the smallest translation distances. Set to 0 to consider all, defaults to 100",
-        "pytype": "int",
-        "default": 100
-      },
-      "trajectory_format": {
-        "type": "string",
-        "description": "Use either trr or xtc trajectory. Assumes no solvent atoms in xtc', defaults to xtc",
-        "pytype": "str",
-        "enum": ["trr","xtc"],
-        "default": "xtc"
-      },
-      "radicals": {
-        "type": "integer",
-        "description": "Space-separated string of radical atom ids, can be empty, usually supplyed through kimmdy, optional",
-        "pytype": "str",
-        "default": null
-      },
-      "change_coords": {
-        "type": "string",
-        "description": "How to change coordinates. H can be placed at the new position, or a (lambda)-dynamics simulation can be performed. For lambda-dynamics, set up the coordinate changer with slow_growth=True. Default: place",
-        "pytype": "str",
-        "enum": ["place", "lambda"],
-        "default": "place"
-      },
-      "kmc": {
-        "description": "KMC algorithm for this reaction. Default: extrande_mod",
-        "type": "string",
-        "pytype": "str",
-        "enum": ["rfkmc", "frm", "extrande", "extrande_mod"],
-        "default": "extrande_mod"
-      },
-      "keep_structures": {
-        "description": "For each reaction a structure is generated. If true, those are kept on disk, otherwise they are only kept in case of a failure. Default: False",
-        "type": "boolean",
-        "pytype": "bool",
-        "default": false
-      }
+      "required": [
+        "frequency_factor",
+        "temperature"
+      ],
+      "additionalProperties": false
     },
-    "required": ["frequency_factor"]
-  }
-    
+    "h_cutoff": {
+      "type": "float",
+      "description": "Cutoff for H atom",
+      "pytype": "float",
+      "default": 3
+    },
+    "cap": {
+      "type": "boolean",
+      "description": "If true, cap structures for prediction. Default False.",
+      "pytype": "bool",
+      "default": false
+    },
+    "model": {
+      "type": "string",
+      "description": "Model name, optional. If not defined, will choose based on grappa usage in KIMMDY.",
+      "pytype": "str",
+      "enum": [
+        "grappa",
+        "classic"
+      ],
+      "default": null
+    },
+    "ensemble_size": {
+      "type": "integer",
+      "description": "Number of models to use, defaults to all, optional",
+      "pytype": "int",
+      "default": null
+    },
+    "prediction_scheme": {
+      "type": "string",
+      "description": "How to predict the reaction barrier. Current options: `efficient`, `all_models` and `parallel`. `parallel` combines the underlying models into one. `efficient` first predicts the barriers with one model, and if a barrier is sufficiently low, recalculates it with the complete ensemble. In the `all_models` scheme, all reactions are evaluated using all models one after the other. Default: `parallel`",
+      "pytype": "str",
+      "enum": [
+        "all_models",
+        "efficient",
+        "parallel"
+      ],
+      "default": "parallel"
+    },
+    "polling_rate": {
+      "type": "integer",
+      "description": "Polling rate, defaults to 10",
+      "pytype": "int",
+      "default": 10
+    },
+    "n_unique": {
+      "type": "integer",
+      "description": "Only consider the n frames per reaction with the smallest translation distances. Set to 0 to consider all, defaults to 100",
+      "pytype": "int",
+      "default": 100
+    },
+    "trajectory_format": {
+      "type": "string",
+      "description": "Use either trr or xtc trajectory. Assumes no solvent atoms in xtc', defaults to xtc",
+      "pytype": "str",
+      "enum": [
+        "trr",
+        "xtc"
+      ],
+      "default": "xtc"
+    },
+    "radicals": {
+      "type": "integer",
+      "description": "Space-separated string of radical atom ids, can be empty, usually supplyed through kimmdy, optional",
+      "pytype": "str",
+      "default": null
+    },
+    "change_coords": {
+      "type": "string",
+      "description": "How to change coordinates. H can be placed at the new position, or a (lambda)-dynamics simulation can be performed. For lambda-dynamics, set up the coordinate changer with slow_growth=True. Default: place",
+      "pytype": "str",
+      "enum": [
+        "place",
+        "lambda"
+      ],
+      "default": "place"
+    },
+    "kmc": {
+      "description": "KMC algorithm for this reaction. Default: extrande_mod",
+      "type": "string",
+      "pytype": "str",
+      "enum": [
+        "rfkmc",
+        "frm",
+        "extrande",
+        "extrande_mod"
+      ],
+      "default": "extrande_mod"
+    },
+    "keep_structures": {
+      "description": "For each reaction a structure is generated. If true, those are kept on disk, otherwise they are only kept in case of a failure. Default: False",
+      "type": "boolean",
+      "pytype": "bool",
+      "default": false
+    }
+  },
+  "required": [
+    "frequency_factor"
+  ]
+}
