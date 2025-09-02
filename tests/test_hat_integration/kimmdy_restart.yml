@@ -10,7 +10,7 @@ restart: true
 tau_scale: 1e-9
 mds:
   equilibrium:
-    mdp: "md.mdp"
+    mdp: "md_short.mdp"
 changer:
   topology:
     parameterization: grappa
