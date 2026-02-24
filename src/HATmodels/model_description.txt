@@ -1,0 +1,4 @@
+Model description:
+
+classic_models: Ensemble model trained as described in https://doi.org/10.1039/D3SC03922F with data available at https://doi.org/10.11588/DATA/TGDD4Y
+grappa_models: Ensemble model trained as described in https://www.biorxiv.org/content/10.1101/2025.07.02.662624v1 with data available at https://doi.org/10.17617/3.LWP1PV
